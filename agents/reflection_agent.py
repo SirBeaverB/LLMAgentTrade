@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 import pandas as pd
-from . import BaseAgent
+from agents import BaseAgent
 
 class ReflectionAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):

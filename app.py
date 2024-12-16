@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-from main import get_market_data, load_historical_decisions
+from utils import get_market_data, load_historical_decisions
 from agents.coordinator_agent import CoordinatorAgent
 from config import AGENT_SETTINGS, TRADING_SETTINGS, NEWS_SOURCES
 import os

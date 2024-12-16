@@ -1,8 +1,8 @@
 from typing import Dict, Any, List
-from . import BaseAgent
-from .news_agent import NewsAgent
-from .reflection_agent import ReflectionAgent
-from .debate_agent import DebateAgent
+from agents import BaseAgent
+from agents.news_agent import NewsAgent
+from agents.reflection_agent import ReflectionAgent
+from agents.debate_agent import DebateAgent
 from config import AGENT_SETTINGS
 
 class CoordinatorAgent(BaseAgent):
