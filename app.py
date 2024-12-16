@@ -145,15 +145,9 @@ def display_analysis_results(result):
     st.markdown('<p class="big-font">Analysis Confidence</p>', unsafe_allow_html=True)
     st.progress(result['confidence_score'])
     st.write(f"{result['confidence_score']:.2%} confidence in analysis")
-    
-    # Display final decision
-    st.markdown('<p class="big-font">Final Decision</p>', unsafe_allow_html=True)
-    with st.expander("View Detailed Analysis", expanded=True):
-        st.markdown(f"<div class='analysis-box'>{result['final_decision']['decision']}</div>", 
-                   unsafe_allow_html=True)
-    
+
     # Display symbol signals
-    st.markdown('<p class="big-font">Symbol Signals</p>', unsafe_allow_html=True)
+    st.markdown('<p class="big-font">Final Decision</p>', unsafe_allow_html=True)
     signals = result['final_decision']['symbol_signals']
     cols = st.columns(len(signals))
     
@@ -167,6 +161,11 @@ def display_analysis_results(result):
                 f"</div>",
                 unsafe_allow_html=True
             )
+    
+    # Display final decision
+    with st.expander("View Detailed Analysis", expanded=True):
+        st.markdown(f"<div class='analysis-box'>{result['final_decision']['decision']}</div>", 
+                   unsafe_allow_html=True)
     
     # Display market context
     st.markdown('<p class="big-font">Market Context</p>', unsafe_allow_html=True)
@@ -207,7 +206,7 @@ def update_config():
 def show_agent_output(agent_type: str, output: dict):
     """Display the output of an individual agent"""
     with st.expander(f"{agent_type.replace('_', ' ').title()} Output", expanded=True):
-        st.markdown(f"<div class='analysis-box'>", unsafe_allow_html=True)
+        # st.markdown(f"<div class='analysis-box'>", unsafe_allow_html=True)
         
         # Display timestamp
         st.write(f"Analysis Time: {output.get('timestamp', 'N/A')}")
