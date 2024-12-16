@@ -59,7 +59,7 @@ class DebateAgent(BaseAgent):
         debate_rounds = []
         
         for round_num in range(self.debate_rounds):
-            # Alternate between bull and bear perspectives
+            #Iterate over all defined roles (fundamental, technical, and risk) in each round
             for role_info in self.roles:
                 role = role_info["description"]
                 perspective_name = role_info["name"]
