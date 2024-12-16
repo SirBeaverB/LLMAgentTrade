@@ -219,7 +219,7 @@ def config_sidebar():
     st.session_state.tier = st.sidebar.radio(
         "Select Tier",
         ["Free", "Premium"],
-        help="Free tier uses open-source models via Ollama. Premium tier requires OpenAI API key."
+        help="Free tier uses HuggingFace models. Premium tier requires OpenAI API key."
     )
     
     if st.session_state.tier == "Premium":
@@ -267,13 +267,22 @@ def config_sidebar():
                         key=f"{agent}_tokens"
                     )
     else:
+        # Free tier configuration
+        st.sidebar.subheader("HuggingFace API Key")
+        hf_api_key = st.sidebar.text_input(
+            "Enter your HuggingFace API key",
+            type="password",
+            help="Get a free API key from huggingface.co",
+            key="huggingface_api_key"
+        )
+        
         # Free tier model selection
         st.sidebar.subheader("Model Selection")
         selected_model = st.sidebar.selectbox(
             "Select Free Model",
             options=AVAILABLE_MODELS["free"],
             index=0,
-            help="Select an open-source model to use"
+            help="Select a HuggingFace model to use"
         )
         FREE_TIER_SETTINGS["model"] = selected_model
         
@@ -373,48 +382,31 @@ def main():
             fig = plot_stock_price(symbol)
             st.plotly_chart(fig, use_container_width=True)
 
-    # Check for API key in premium tier
-    if "Premium" in st.session_state.get("tier", "Free") and not st.session_state.get("openai_api_key"):
-        st.error("Please enter your OpenAI API key in the sidebar to use the premium tier.")
-        st.stop()
-    
-    # Set the API key for premium tier
-    if st.session_state.get("openai_api_key"):
+    # Check for API keys based on tier
+    if st.session_state.tier == "Premium":
+        if not st.session_state.get("openai_api_key"):
+            st.error("Please enter your OpenAI API key in the sidebar to use the premium tier.")
+            st.stop()
         os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
     else:
-        # Use free tier settings
-        for agent in AGENT_SETTINGS:
-            AGENT_SETTINGS[agent].update(FREE_TIER_SETTINGS)
-        
-        # Check Ollama installation
-        try:
-            response = requests.get("http://localhost:11434/api/tags")
-            if response.status_code != 200:
-                st.error("""
-                    Could not connect to Ollama. Please ensure Ollama is installed and running.
-                    
-                    Installation steps:
-                    1. Visit https://ollama.ai
-                    2. Download and install Ollama
-                    3. Run Ollama on your system
-                    4. Restart this application
-                    
-                    Alternatively, you can use the Premium tier with an OpenAI API key.
-                """)
-                st.stop()
-        except requests.exceptions.ConnectionError:
+        if not st.session_state.get("huggingface_api_key"):
             st.error("""
-                Could not connect to Ollama. Please ensure Ollama is installed and running.
+                Please enter your HuggingFace API key in the sidebar to use the free tier.
                 
-                Installation steps:
-                1. Visit https://ollama.ai
-                2. Download and install Ollama
-                3. Run Ollama on your system
-                4. Restart this application
+                To get a free API key:
+                1. Visit huggingface.co
+                2. Create a free account
+                3. Go to Settings > Access Tokens
+                4. Create a new token
                 
                 Alternatively, you can use the Premium tier with an OpenAI API key.
             """)
             st.stop()
+        os.environ["HUGGINGFACE_API_KEY"] = st.session_state.huggingface_api_key
+        
+        # Update all agents to use free tier settings
+        for agent in AGENT_SETTINGS:
+            AGENT_SETTINGS[agent].update(FREE_TIER_SETTINGS)
     
     # Create placeholder for real-time updates
     agent_outputs = st.empty()
