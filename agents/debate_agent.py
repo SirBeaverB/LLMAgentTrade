@@ -1,5 +1,6 @@
 from typing import Dict, Any, List
 from agents import BaseAgent
+from agents.debate_memory import MemorySummaryAgent
 
 class DebateAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
@@ -29,6 +30,9 @@ class DebateAgent(BaseAgent):
                                     Argue briefly and directly."""
                 }
             ]
+        self.memory_summarizer = MemorySummaryAgent(config=config)
+        self.mid_term_memory = []
+        self.short_term_memory = []
     
     def analyze(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -79,6 +83,12 @@ class DebateAgent(BaseAgent):
                 Proposed Action:
                 {proposed_action}
 
+                Mid-term Memory (accumulated):
+                {self._get_mid_term_info()}
+
+                Short-term Memory (last round only):
+                {self._get_short_term_info()}
+
                 Previous Arguments:
                 {self._format_previous_rounds(debate_rounds)}
 
@@ -99,17 +109,32 @@ class DebateAgent(BaseAgent):
                     "perspective": perspective_name,
                     "arguments": response
                 })
+
+            last_round_num = debate_rounds[-1]['round']
+            this_round_data = [r['arguments'] for r in debate_rounds if r['round'] == last_round_num]
+            round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
+            self.short_term_memory.clear()
+            self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
+            self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
         
         return debate_rounds
     
     def _synthesize_debate(self, debate_rounds: List[Dict[str, Any]]) -> str:
         """Synthesize the debate rounds into a final analysis"""
+        mid_term_info = self._get_mid_term_info()
+        short_term_info = self._get_short_term_info()
         role = """You are a senior market strategist tasked with synthesizing insights 
                     from three specialized analysts (fundamental, technical, and risk). 
                     Combine their perspectives into a balanced and actionable final analysis."""
         
         content = f"""
         Synthesize the following debate rounds into a final analysis:
+
+        Mid-term Memory (accumulated from all rounds):
+        {self._get_mid_term_info()}
+
+        Short-term Memory (just last round):
+        {self._get_short_term_info()}
         
         Debate History:
         {self._format_previous_rounds(debate_rounds)}
@@ -124,7 +149,6 @@ class DebateAgent(BaseAgent):
         return self._create_prompt(role, content)
     
     def _format_previous_rounds(self, debate_rounds: List[Dict[str, Any]]) -> str:
-        """Format previous debate rounds for context"""
         if not debate_rounds:
             return "No previous arguments."
         
@@ -136,6 +160,18 @@ class DebateAgent(BaseAgent):
             )
         
         return "\n".join(formatted_rounds)
+
+    def _get_mid_term_info(self) -> str:
+        if not self.mid_term_memory:
+            return "No mid-term memory recorded."
+        return " | ".join(self.mid_term_memory)
+
+    def _get_short_term_info(self) -> str:
+        if not self.short_term_memory:
+            return "No short-term memory recorded."
+        return self.short_term_memory[-1]
+    
+
     
     def _calculate_confidence(self, debate_rounds: List[Dict[str, Any]], market_data: Dict[str, Any]) -> float:
         """
