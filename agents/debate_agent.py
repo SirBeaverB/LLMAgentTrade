@@ -61,7 +61,10 @@ class DebateAgent(BaseAgent):
         for round_num in range(self.debate_rounds):
             #Iterate over all defined roles (fundamental, technical, and risk) in each round
             for role_info in self.roles:
-                role = role_info["description"]
+                if round_num == 0:
+                    role = role_info["description"]
+                else:
+                    role = f"You are the {role_info['name']} analyst. Keep focusing on your domain."
                 perspective_name = role_info["name"]
                 
                 content = f"""
@@ -76,7 +79,7 @@ class DebateAgent(BaseAgent):
                 Previous Arguments:
                 {self._format_previous_rounds(debate_rounds)}
 
-                Present your {perspective_name} argument, analysis, and recommendation from your perspective.
+                Present your {perspective_name} argument from your perspective clean and straight to the point.
                 """
 
                 response = self._create_prompt(role, content)
