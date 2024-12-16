@@ -15,89 +15,68 @@ import json
 st.set_page_config(
     page_title="Multi-Agent Quants - AI Trading Analysis",
     page_icon="utils/icon.ico",
-    layout="wide"
+    layout="wide",
+    menu_items={
+        'Get Help': 'https://github.com/ZhengxuYan/Multi-Agent-Quants/issues',
+        'Report a bug': "https://github.com/ZhengxuYan/Multi-Agent-Quants/issues",
+        'About': "https://github.com/ZhengxuYan/Multi-Agent-Quants"
+    }
 )
 
 st.markdown("""
     <style>
-    /* Global styles */
-    .stApp {
-        background-color: #0E1117;
-        color: white;
-    }
-    
+    /* Theme-aware styles */
     .big-font {
         font-size: 28px !important;
         font-weight: bold;
-        color: white;
     }
     
     .analysis-box {
-        background-color: #1E1E1E;
+        border: 1px solid var(--st-color-background-edge);
+        background-color: var(--st-color-background-secondary);
         padding: 25px;
         border-radius: 12px;
         margin: 15px 0;
-        color: white;
         line-height: 1.6;
     }
     
     .signal-positive {
-        color: #00FF00;
+        color: #00CC00;
         font-weight: bold;
-        background-color: rgba(0, 255, 0, 0.1);
+        background-color: rgba(0, 204, 0, 0.1);
         padding: 8px 12px;
         border-radius: 6px;
     }
     
     .signal-negative {
-        color: #FF0000;
+        color: #CC0000;
         font-weight: bold;
-        background-color: rgba(255, 0, 0, 0.1);
+        background-color: rgba(204, 0, 0, 0.1);
         padding: 8px 12px;
         border-radius: 6px;
     }
     
-    .analysis-box h3 {
-        color: white;
-        margin-bottom: 12px;
-    }
-    
-    .analysis-box p {
-        color: white;
-    }
-    
-    /* Additional styles for Streamlit elements */
-    .stMarkdown, .stText, .stButton, .stSelectbox {
-        color: white;
-    }
-    
-    .streamlit-expanderHeader {
-        background-color: #1E1E1E !important;
-        color: white !important;
-    }
-    
+    /* Theme-aware table styles */
     div[data-testid="stDataFrame"] {
-        background-color: #1E1E1E;
-        color: white;
+        background-color: var(--st-color-background-secondary);
     }
     
     div[data-testid="stDataFrame"] td {
-        background-color: #2C2C2C;
-        color: white;
+        background-color: var(--st-color-background-primary);
     }
     
     div[data-testid="stDataFrame"] th {
-        background-color: #1E1E1E;
-        color: white;
+        background-color: var(--st-color-background-secondary);
     }
     
-    .stSidebar {
-        background-color: #0E1117;
-        color: white;
+    /* Theme-aware expander */
+    .streamlit-expanderHeader {
+        background-color: var(--st-color-background-secondary) !important;
     }
     
+    /* Progress bar background */
     .stProgress > div > div {
-        background-color: #1E1E1E;
+        background-color: var(--st-color-background-secondary);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -175,9 +154,6 @@ def display_analysis_results(result):
         
         # Style the dataframe
         styled_df = df.style.set_properties(**{
-            'background-color': '#1E1E1E',
-            'color': 'white',
-            'border-color': '#2C2C2C',
             'font-size': '1rem',
             'padding': '0.5rem'
         }).format(precision=2)  # Round numeric values to 2 decimal places
