@@ -13,8 +13,8 @@ import json
 
 # Page config
 st.set_page_config(
-    page_title="LLMAgentTrade - AI Trading Analysis",
-    page_icon="📈",
+    page_title="Multi-Agent Quants - AI Trading Analysis",
+    page_icon="utils/icon.ico",
     layout="wide"
 )
 
