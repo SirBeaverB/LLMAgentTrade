@@ -1,7 +1,7 @@
 from typing import Dict, Any, List
 from newspaper import Article
 import yfinance as yf
-from . import BaseAgent
+from agents import BaseAgent
 from config import NEWS_SOURCES
 
 class NewsAgent(BaseAgent):

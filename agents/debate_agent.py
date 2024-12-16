@@ -1,5 +1,5 @@
 from typing import Dict, Any, List
-from . import BaseAgent
+from agents import BaseAgent
 
 class DebateAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
