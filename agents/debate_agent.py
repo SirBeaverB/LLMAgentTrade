@@ -76,11 +76,7 @@ class DebateAgent(BaseAgent):
                 Previous Arguments:
                 {self._format_previous_rounds(debate_rounds)}
 
-                Present your {perspective_name} argument, addressing:
-                1. Market Conditions
-                2. Technical Factors
-                3. Risk Assessment
-                4. Potential Outcomes
+                Present your {perspective_name} argument, analysis, and recommendation from your perspective.
                 """
 
                 response = self._create_prompt(role, content)
