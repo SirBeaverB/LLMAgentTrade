@@ -4,26 +4,29 @@ from . import BaseAgent
 class DebateAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.debate_rounds = 3
+        self.debate_rounds = 2
         self.roles = [
                 {
                     "name": "fundamental",
                     "description": """You are a Fundamental Analyst focusing on macroeconomic indicators,
                                     company financials, sector trends, and other fundamental factors that
                                     influence the asset's intrinsic value. 
-                                    Your goal is to provide arguments about the proposed action from a fundamental perspective."""
+                                    Your goal is to provide arguments about the proposed action from a fundamental perspective.
+                                    Argue briefly and directly."""
                 },
                 {
                     "name": "technical",
                     "description": """You are a Technical Analyst focusing on price trends, chart patterns,
                                     technical indicators, and volume analysis.
-                                    Your goal is to provide arguments about the proposed action from a technical perspective."""
+                                    Your goal is to provide arguments about the proposed action from a technical perspective.
+                                    Argue briefly and directly."""
                 },
                 {
                     "name": "risk",
                     "description": """You are a Risk Analyst focusing on potential risks, uncertainties, 
                                     volatility, regulatory changes, and market sentiment shifts.
-                                    Your goal is to provide arguments about the proposed action from a risk management perspective."""
+                                    Your goal is to provide arguments about the proposed action from a risk management perspective.
+                                    Argue briefly and directly."""
                 }
             ]
     
@@ -78,6 +81,13 @@ class DebateAgent(BaseAgent):
 
                 Previous Arguments:
                 {self._format_previous_rounds(debate_rounds)}
+
+                Instructions:
+                - Review the previous arguments above.
+                - Identify at least one specific point from another perspective that you disagree with or wish to challenge.
+                - Respond in about 4-5 sentences, directly addressing that point and providing your viewpoint.
+                - Maintain your analytical focus ({perspective_name}), but ensure this feels like a debate: challenge or counter a claim.
+                - You can also reinforce or clarify your stance if needed, but do not just repeat your previous points verbatim.
 
                 Present your {perspective_name} argument from your perspective clean and straight to the point.
                 """
