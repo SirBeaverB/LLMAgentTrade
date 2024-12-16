@@ -27,18 +27,24 @@ class CoordinatorAgent(BaseAgent):
             "symbols": data.get("symbols", []),
             "timestamp": data.get("timestamp")
         })
+
+        print(f"News Analysis: {news_analysis}")
         
         reflection_analysis = self.reflection_agent.analyze({
             "historical_decisions": data.get("historical_decisions", []),
             "current_market": data.get("market_data", {}),
             "timestamp": data.get("timestamp")
         })
+
+        print(f"Reflection Analysis: {reflection_analysis}")
         
         debate_analysis = self.debate_agent.analyze({
             "market_data": data.get("market_data", {}),
             "proposed_action": data.get("proposed_action", {}),
             "timestamp": data.get("timestamp")
         })
+
+        print(f"Debate Analysis: {debate_analysis}")
         
         # Synthesize all analyses
         final_decision = self._synthesize_analyses(
@@ -60,7 +66,7 @@ class CoordinatorAgent(BaseAgent):
                 news_analysis,
                 reflection_analysis,
                 debate_analysis
-            )
+            ),
         }
         
         self.save_to_memory(analysis_result)
@@ -75,7 +81,8 @@ class CoordinatorAgent(BaseAgent):
     ) -> Dict[str, Any]:
         """Synthesize analyses from all agents into final decision"""
         role = """You are a master trading strategist responsible for making the final 
-        trading decision based on multiple perspectives and analyses."""
+        trading decision based on multiple perspectives and analyses. For each symbol,
+        you must provide a clear boolean signal (True for bullish/positive, False for bearish/negative)."""
         
         content = f"""
         Synthesize the following analyses into a final trading decision:
@@ -98,14 +105,31 @@ class CoordinatorAgent(BaseAgent):
         3. Risk Management Strategy
         4. Implementation Plan
         5. Monitoring Criteria
+        
+        For each symbol in {context.get('symbols', [])}, provide a clear boolean signal:
+        - True: Bullish/Positive outlook
+        - False: Bearish/Negative outlook
         """
         
         response = self._create_prompt(role, content)
         
+        # Extract boolean signals for each symbol
+        symbols = context.get('symbols', [])
+        symbol_signals = {}
+        
+        # You might need to parse the response to extract boolean signals
+        # This is a placeholder - implement actual parsing logic based on your LLM's response format
+        for symbol in symbols:
+            # Parse the response to determine if the sentiment for this symbol is positive
+            # This is simplified - you'll need to implement proper parsing based on your LLM's output
+            is_positive = "positive" in response.lower() and symbol.lower() in response.lower()
+            symbol_signals[symbol] = is_positive
+        
         return {
             "decision": response,
             "timestamp": context.get("timestamp"),
-            "market_context": context.get("market_data", {})
+            "market_context": context.get("market_data", {}),
+            "symbol_signals": symbol_signals
         }
     
     def _calculate_overall_confidence(

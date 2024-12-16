@@ -78,8 +78,13 @@ def main():
         print(f"\nConfidence Score: {result['confidence_score']:.2%}")
         print("\nFinal Decision:")
         print(result['final_decision']['decision'])
+
+        print("\nSymbol Signals:")
+        print(result['final_decision']['symbol_signals'])
         
-        # You could implement actual trading execution here
+        # Print the market context
+        print("\nMarket Context:")
+        print(result['final_decision']['market_context'])
         
     except Exception as e:
         print(f"Error during analysis: {str(e)}")
