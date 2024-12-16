@@ -240,6 +240,15 @@ def config_sidebar():
     """Create the configuration sidebar"""
     st.sidebar.title("Configuration")
     
+    # API Key Configuration
+    st.sidebar.subheader("OpenAI API Key")
+    api_key = st.sidebar.text_input(
+        "Enter your OpenAI API key",
+        type="password",
+        help="Your API key will not be stored and will only be used for this session",
+        key="openai_api_key"
+    )
+    
     # Model Configuration Section
     st.sidebar.subheader("Model Settings")
     
@@ -310,14 +319,16 @@ def config_sidebar():
 def main():
     st.title("🤖 LLMAgentTrade - AI Trading Analysis")
     
-    # Check for API key
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        st.error("Please set your OpenAI API key in the environment variables.")
-        st.stop()
-    
     # Get configuration from sidebar
     config_sidebar()
+    
+    # Check for API key
+    if not st.session_state.get("openai_api_key"):
+        st.error("Please enter your OpenAI API key in the sidebar.")
+        st.stop()
+    
+    # Set the API key for this session
+    os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
     
     # Symbol selection in main page
     st.markdown('<p class="big-font">Select Symbols to Analyze</p>', unsafe_allow_html=True)
