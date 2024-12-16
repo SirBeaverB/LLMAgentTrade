@@ -78,9 +78,6 @@ LLMAgentTrade/
 │   ├── reflection_agent.py
 │   ├── debate_agent.py
 │   └── coordinator_agent.py
-├── utils/
-│   ├── __init__.py
-│   └── helpers.py
 ├── config.py
 ├── main.py
 ├── app.py
@@ -97,7 +94,7 @@ All settings can be adjusted through the web interface:
 
 ## Requirements
 
-- Python 3.8+
+- Python 3.10
 - OpenAI API key
 - Required packages listed in requirements.txt
 

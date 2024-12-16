@@ -142,13 +142,13 @@ def plot_stock_price(symbol: str):
 def display_analysis_results(result):
     """Display the analysis results in a structured format"""
     # Display confidence score
-    st.markdown('<p class="big-font">Analysis Confidence</p>', unsafe_allow_html=True)
+    st.markdown('### Analysis Confidence')
     st.progress(result['confidence_score'])
     st.write(f"{result['confidence_score']:.2%} confidence in analysis")
 
     # Display symbol signals
-    st.markdown('<p class="big-font">Final Decision</p>', unsafe_allow_html=True)
     signals = result['final_decision']['symbol_signals']
+    print(signals)
     cols = st.columns(len(signals))
     
     for col, (symbol, signal) in zip(cols, signals.items()):
@@ -168,7 +168,7 @@ def display_analysis_results(result):
                    unsafe_allow_html=True)
     
     # Display market context
-    st.markdown('<p class="big-font">Market Context</p>', unsafe_allow_html=True)
+    st.markdown('### Market Context')
     market_data = result['final_decision']['market_context']
     if market_data:
         df = pd.DataFrame(market_data).T
@@ -205,7 +205,7 @@ def update_config():
 
 def show_agent_output(agent_type: str, output: dict):
     """Display the output of an individual agent"""
-    with st.expander(f"{agent_type.replace('_', ' ').title()} Output", expanded=True):
+    with st.expander(f"{agent_type.replace('_', ' ').title()} Output", expanded=False):
         # st.markdown(f"<div class='analysis-box'>", unsafe_allow_html=True)
         
         # Display timestamp
@@ -246,6 +246,36 @@ def config_sidebar():
         type="password",
         help="Your API key will not be stored and will only be used for this session",
         key="openai_api_key"
+    )
+    
+    # Agent Enable/Disable Section
+    st.sidebar.subheader("Enable/Disable Agents")
+    
+    # Initialize session state for agent toggles if not exists
+    if "enabled_agents" not in st.session_state:
+        st.session_state.enabled_agents = {
+            "news_agent": True,
+            "reflection_agent": True,
+            "debate_agent": True
+        }
+    
+    # Create toggles for each agent except coordinator
+    st.session_state.enabled_agents["news_agent"] = st.sidebar.checkbox(
+        "News Agent",
+        value=st.session_state.enabled_agents["news_agent"],
+        help="Analyzes current news and market sentiment"
+    )
+
+    st.session_state.enabled_agents["reflection_agent"] = st.sidebar.checkbox(
+        "Reflection Agent",
+        value=st.session_state.enabled_agents["reflection_agent"],
+        help="Analyzes historical decisions and patterns"
+    )
+
+    st.session_state.enabled_agents["debate_agent"] = st.sidebar.checkbox(
+        "Debate Agent",
+        value=st.session_state.enabled_agents["debate_agent"],
+        help="Creates pros and cons analysis"
     )
     
     # Model Configuration Section
@@ -316,7 +346,7 @@ def config_sidebar():
         st.sidebar.success("Configuration updated successfully!")
 
 def main():
-    st.title("🤖 LLMAgentTrade - AI Trading Analysis")
+    st.title("🤖 Multi-Agent Quants - AI Trading Analysis")
     
     # Get configuration from sidebar
     config_sidebar()
@@ -374,7 +404,8 @@ def main():
                     "type": "ANALYSIS",
                     "symbols": selected_symbols,
                     "risk_level": TRADING_SETTINGS["risk_tolerance"]
-                }
+                },
+                "enabled_agents": st.session_state.enabled_agents  # Pass enabled agents configuration
             }
             
             # Get trading decision
@@ -383,34 +414,36 @@ def main():
                 with agent_outputs.container():
                     st.markdown('<p class="big-font">Agent Outputs</p>', unsafe_allow_html=True)
                     
-                    # Get and display news analysis
-                    news_analysis = coordinator.news_agent.analyze({
-                        "symbols": selected_symbols,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    show_agent_output("news_agent", news_analysis)
+                    # Only show enabled agent outputs
+                    print(st.session_state.enabled_agents)
+                    if st.session_state.enabled_agents["news_agent"]:
+                        news_analysis = coordinator.news_agent.analyze({
+                            "symbols": selected_symbols,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        show_agent_output("news_agent", news_analysis)
                     
-                    # Get and display reflection analysis
-                    reflection_analysis = coordinator.reflection_agent.analyze({
-                        "historical_decisions": historical_decisions,
-                        "current_market": market_data,
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    show_agent_output("reflection_agent", reflection_analysis)
+                    if st.session_state.enabled_agents["reflection_agent"]:
+                        reflection_analysis = coordinator.reflection_agent.analyze({
+                            "historical_decisions": historical_decisions,
+                            "current_market": market_data,
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        show_agent_output("reflection_agent", reflection_analysis)
                     
-                    # Get and display debate analysis
-                    debate_analysis = coordinator.debate_agent.analyze({
-                        "market_data": market_data,
-                        "proposed_action": analysis_context["proposed_action"],
-                        "timestamp": datetime.now().isoformat()
-                    })
-                    show_agent_output("debate_agent", debate_analysis)
+                    if st.session_state.enabled_agents["debate_agent"]:
+                        debate_analysis = coordinator.debate_agent.analyze({
+                            "market_data": market_data,
+                            "proposed_action": analysis_context["proposed_action"],
+                            "timestamp": datetime.now().isoformat()
+                        })
+                        show_agent_output("debate_agent", debate_analysis)
                     
                     # Get final decision
                     result = coordinator._synthesize_analyses(
-                        news_analysis,
-                        reflection_analysis,
-                        debate_analysis,
+                        news_analysis if st.session_state.enabled_agents["news_agent"] else None,
+                        reflection_analysis if st.session_state.enabled_agents["reflection_agent"] else None,
+                        debate_analysis if st.session_state.enabled_agents["debate_agent"] else None,
                         analysis_context
                     )
                     
@@ -418,9 +451,10 @@ def main():
                     st.markdown('<p class="big-font">Final Analysis</p>', unsafe_allow_html=True)
                     display_analysis_results({
                         "confidence_score": coordinator._calculate_overall_confidence(
-                            news_analysis,
-                            reflection_analysis,
-                            debate_analysis
+                            news_analysis if st.session_state.enabled_agents["news_agent"] else None,
+                            reflection_analysis if st.session_state.enabled_agents["reflection_agent"] else None,
+                            debate_analysis if st.session_state.enabled_agents["debate_agent"] else None,
+                            st.session_state.enabled_agents
                         ),
                         "final_decision": result
                     })
