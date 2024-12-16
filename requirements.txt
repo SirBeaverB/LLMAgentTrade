@@ -59,7 +59,6 @@ newspaper3k==0.2.8
 nltk==3.9.1
 numpy==1.24.3
 openai==1.57.4
-ollama==0.1.6
 orjson==3.10.12
 packaging==23.2
 pandas==2.1.3

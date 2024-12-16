@@ -447,6 +447,7 @@ def main():
                 # Initialize container for agent outputs
                 with agent_outputs.container():
                     st.markdown('<p class="big-font">Agent Outputs</p>', unsafe_allow_html=True)
+
                     
                     # Only show enabled agent outputs
                     if st.session_state.enabled_agents["news_agent"]:
