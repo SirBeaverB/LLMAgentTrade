@@ -7,6 +7,13 @@ load_dotenv()
 # OpenAI API Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
+# Free tier configuration using Ollama
+FREE_TIER_SETTINGS = {
+    "model": "llama2",  # Default free model
+    "temperature": 0.7,
+    "max_tokens": 1000
+}
+
 # Agent Configuration
 AGENT_SETTINGS = {
     "news_agent": {
@@ -29,6 +36,12 @@ AGENT_SETTINGS = {
         "temperature": 0.3,
         "max_tokens": 1000
     }
+}
+
+# Available models
+AVAILABLE_MODELS = {
+    "premium": ["gpt-3.5-turbo", "gpt-4", "gpt-4o-mini", "gpt-4o"],
+    "free": ["llama2", "mistral", "codellama", "phi"]
 }
 
 # News Sources Configuration
