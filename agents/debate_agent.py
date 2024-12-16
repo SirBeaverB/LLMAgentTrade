@@ -4,7 +4,7 @@ from agents import BaseAgent
 class DebateAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.debate_rounds = 2
+        self.debate_rounds = 3
         self.roles = [
                 {
                     "name": "fundamental",
