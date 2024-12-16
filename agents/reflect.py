@@ -2,6 +2,7 @@ from typing import Dict, Any, List
 import pandas as pd
 from datetime import datetime, timedelta
 from . import BaseAgent
+import re
 
 
 class ReflectionAgent(BaseAgent):
@@ -89,13 +90,66 @@ class ReflectionAgent(BaseAgent):
         return "Insufficient historical data for analysis."
 
     def _extract_patterns(self, historical_data: str) -> List[Dict[str, Any]]:
-        return [
-            {
-                "pattern_type": "market_condition",
-                "frequency": "high",
-                "success_rate": 0.75
-            }
-        ]
+        patterns = []
+        success_rate_match = re.search(
+            r"Success Rate:\s*([\d\.]+)%", historical_data)
+        avg_return_match = re.search(
+            r"Average Return:\s*([\d\.]+)%", historical_data)
+
+        success_rate = float(success_rate_match.group(1)
+                             ) if success_rate_match else 0.0
+        avg_return = float(avg_return_match.group(1)
+                           ) if avg_return_match else 0.0
+        if success_rate > 70:
+            patterns.append({
+                "pattern_type": "strong_performance",
+                "metric": "success_rate",
+                "value": success_rate,
+                "description": "Historical success rate is above 70%, indicating strong performance."
+            })
+
+        if avg_return > 5:
+            patterns.append({
+                "pattern_type": "high_average_return",
+                "metric": "avg_return",
+                "value": avg_return,
+                "description": "Average return is above 5%, indicating consistently good outcomes."
+            })
+
+        recent_lines = []
+        start_parsing = False
+        for line in historical_data.split('\n'):
+            line = line.strip()
+            if "Recent Decisions:" in line:
+                start_parsing = True
+                continue
+            if start_parsing and line:
+                recent_lines.append(line)
+
+        success_count = 0
+        for dec_line in recent_lines:
+            parts = dec_line.split()
+            if len(parts) >= 3:
+                outcome = parts[2].lower()
+                if outcome == "success":
+                    success_count += 1
+                else:
+                    success_count = 0
+            if success_count >= 3:
+                patterns.append({
+                    "pattern_type": "streak_of_successes",
+                    "streak_length": success_count,
+                    "description": f"Found a streak of {success_count} consecutive successful decisions."
+                })
+                success_count = 0
+
+        if not patterns:
+            patterns.append({
+                "pattern_type": "no_significant_pattern",
+                "description": "No significant patterns detected based on the given historical data."
+            })
+
+        return patterns
 
     def _create_prompt(self, role: str, content: str) -> str:
         prompt = f"{role}\n\n{content}"
@@ -119,3 +173,24 @@ class ReflectionAgent(BaseAgent):
             }
             self.long_term_memory.append(aggregated_entry)
             self.short_term_memory = []
+
+    def _summarize_long_term_memory(self) -> str:
+        if not self.long_term_memory:
+            return "No long-term insights available."
+        summary = "Long-Term Memory Entries:\n"
+        for entry in self.long_term_memory[-3:]:
+            summary += f"- {entry['timestamp']
+                            } with {len(entry['aggregated_results'])} items\n"
+        return summary
+
+    def _summarize_short_term_memory(self) -> str:
+        if not self.short_term_memory:
+            return "No short-term insights available."
+        summary = f"Short-Term Memory has {
+            len(self.short_term_memory)} entries.\n"
+        last_entry = self.short_term_memory[-1]
+        summary += f"Last entry reflection timestamp: {
+            last_entry['timestamp']}\n"
+        summary += f"Last entry reflection content excerpt: {
+            last_entry['reflection_analysis'][:100]}...\n"
+        return summary
