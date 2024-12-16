@@ -223,6 +223,27 @@ def config_sidebar():
         help="Your API key will not be stored and will only be used for this session",
         key="openai_api_key"
     )
+
+    # Trading Settings Section
+    st.sidebar.subheader("Trading Settings")
+    
+    st.sidebar.selectbox(
+        "Analysis Timeframe",
+        options=["1d", "5d", "1mo", "3mo", "6mo", "1y"],
+        index=["1d", "5d", "1mo", "3mo", "6mo", "1y"].index(TRADING_SETTINGS["analysis_timeframe"]),
+        key="analysis_timeframe"
+    )
+    
+    st.sidebar.slider(
+        "Risk Tolerance",
+        min_value=0.01,
+        max_value=0.10,
+        value=TRADING_SETTINGS["risk_tolerance"],
+        step=0.01,
+        format="%.2f",
+        key="risk_tolerance",
+        help="Maximum risk per trade (as a decimal)"
+    )
     
     # Agent Enable/Disable Section
     st.sidebar.subheader("Enable/Disable Agents")
@@ -287,27 +308,6 @@ def config_sidebar():
                 key=f"{agent}_tokens"
             )
     
-    # Trading Settings Section
-    st.sidebar.subheader("Trading Settings")
-    
-    st.sidebar.selectbox(
-        "Analysis Timeframe",
-        options=["1d", "5d", "1mo", "3mo", "6mo", "1y"],
-        index=["1d", "5d", "1mo", "3mo", "6mo", "1y"].index(TRADING_SETTINGS["analysis_timeframe"]),
-        key="analysis_timeframe"
-    )
-    
-    st.sidebar.slider(
-        "Risk Tolerance",
-        min_value=0.01,
-        max_value=0.10,
-        value=TRADING_SETTINGS["risk_tolerance"],
-        step=0.01,
-        format="%.2f",
-        key="risk_tolerance",
-        help="Maximum risk per trade (as a decimal)"
-    )
-    
     # News Sources Configuration
     st.sidebar.subheader("News Sources")
     news_sources = st.sidebar.multiselect(
@@ -326,14 +326,6 @@ def main():
     
     # Get configuration from sidebar
     config_sidebar()
-    
-    # Check for API key
-    if not st.session_state.get("openai_api_key"):
-        st.error("Please enter your OpenAI API key in the sidebar.")
-        st.stop()
-    
-    # Set the API key for this session
-    os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
     
     # Symbol selection in main page
     st.markdown('<p class="big-font">Select Symbols to Analyze</p>', unsafe_allow_html=True)
@@ -356,6 +348,14 @@ def main():
         with col:
             fig = plot_stock_price(symbol)
             st.plotly_chart(fig, use_container_width=True)
+
+    # Check for API key
+    if not st.session_state.get("openai_api_key"):
+        st.error("Please enter your OpenAI API key in the sidebar.")
+        st.stop()
+    
+    # Set the API key for this session
+    os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
     
     # Create placeholder for real-time updates
     agent_outputs = st.empty()
