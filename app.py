@@ -7,7 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from utils import get_market_data, load_historical_decisions
 from agents.coordinator_agent import CoordinatorAgent
-from config import AGENT_SETTINGS, TRADING_SETTINGS, NEWS_SOURCES
+from config import AGENT_SETTINGS, TRADING_SETTINGS, NEWS_SOURCES, AVAILABLE_MODELS, FREE_TIER_SETTINGS
 import os
 import json
 
@@ -15,89 +15,68 @@ import json
 st.set_page_config(
     page_title="Multi-Agent Quants - AI Trading Analysis",
     page_icon="utils/icon.ico",
-    layout="wide"
+    layout="wide",
+    menu_items={
+        'Get Help': 'https://github.com/ZhengxuYan/Multi-Agent-Quants/issues',
+        'Report a bug': "https://github.com/ZhengxuYan/Multi-Agent-Quants/issues",
+        'About': "https://github.com/ZhengxuYan/Multi-Agent-Quants"
+    }
 )
 
 st.markdown("""
     <style>
-    /* Global styles */
-    .stApp {
-        background-color: #0E1117;
-        color: white;
-    }
-    
+    /* Theme-aware styles */
     .big-font {
         font-size: 28px !important;
         font-weight: bold;
-        color: white;
     }
     
     .analysis-box {
-        background-color: #1E1E1E;
+        border: 1px solid var(--st-color-background-edge);
+        background-color: var(--st-color-background-secondary);
         padding: 25px;
         border-radius: 12px;
         margin: 15px 0;
-        color: white;
         line-height: 1.6;
     }
     
     .signal-positive {
-        color: #00FF00;
+        color: #00CC00;
         font-weight: bold;
-        background-color: rgba(0, 255, 0, 0.1);
+        background-color: rgba(0, 204, 0, 0.1);
         padding: 8px 12px;
         border-radius: 6px;
     }
     
     .signal-negative {
-        color: #FF0000;
+        color: #CC0000;
         font-weight: bold;
-        background-color: rgba(255, 0, 0, 0.1);
+        background-color: rgba(204, 0, 0, 0.1);
         padding: 8px 12px;
         border-radius: 6px;
     }
     
-    .analysis-box h3 {
-        color: white;
-        margin-bottom: 12px;
-    }
-    
-    .analysis-box p {
-        color: white;
-    }
-    
-    /* Additional styles for Streamlit elements */
-    .stMarkdown, .stText, .stButton, .stSelectbox {
-        color: white;
-    }
-    
-    .streamlit-expanderHeader {
-        background-color: #1E1E1E !important;
-        color: white !important;
-    }
-    
+    /* Theme-aware table styles */
     div[data-testid="stDataFrame"] {
-        background-color: #1E1E1E;
-        color: white;
+        background-color: var(--st-color-background-secondary);
     }
     
     div[data-testid="stDataFrame"] td {
-        background-color: #2C2C2C;
-        color: white;
+        background-color: var(--st-color-background-primary);
     }
     
     div[data-testid="stDataFrame"] th {
-        background-color: #1E1E1E;
-        color: white;
+        background-color: var(--st-color-background-secondary);
     }
     
-    .stSidebar {
-        background-color: #0E1117;
-        color: white;
+    /* Theme-aware expander */
+    .streamlit-expanderHeader {
+        background-color: var(--st-color-background-secondary) !important;
     }
     
+    /* Progress bar background */
     .stProgress > div > div {
-        background-color: #1E1E1E;
+        background-color: var(--st-color-background-secondary);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -175,9 +154,6 @@ def display_analysis_results(result):
         
         # Style the dataframe
         styled_df = df.style.set_properties(**{
-            'background-color': '#1E1E1E',
-            'color': 'white',
-            'border-color': '#2C2C2C',
             'font-size': '1rem',
             'padding': '0.5rem'
         }).format(precision=2)  # Round numeric values to 2 decimal places
@@ -239,14 +215,80 @@ def config_sidebar():
     """Create the configuration sidebar"""
     st.sidebar.title("Configuration")
     
-    # API Key Configuration
-    st.sidebar.subheader("OpenAI API Key")
-    api_key = st.sidebar.text_input(
-        "Enter your OpenAI API key",
-        type="password",
-        help="Your API key will not be stored and will only be used for this session",
-        key="openai_api_key"
+    # Tier Selection
+    st.session_state.tier = st.sidebar.radio(
+        "Select Tier",
+        ["Free", "Premium"],
+        help="Free tier uses HuggingFace models. Premium tier requires OpenAI API key."
     )
+    
+    if st.session_state.tier == "Premium":
+        # API Key Configuration
+        st.sidebar.subheader("OpenAI API Key")
+        api_key = st.sidebar.text_input(
+            "Enter your OpenAI API key",
+            type="password",
+            help="Your API key will not be stored and will only be used for this session",
+            key="openai_api_key"
+        )
+        
+        # Model Configuration Section
+        if api_key:
+            st.sidebar.subheader("Model Settings")
+            
+            # Create tabs for different agent configurations
+            agent_tabs = st.sidebar.tabs(["News", "Reflection", "Debate", "Coordinator"])
+            
+            for agent, tab in zip(AGENT_SETTINGS.keys(), agent_tabs):
+                with tab:
+                    st.selectbox(
+                        "Model",
+                        options=AVAILABLE_MODELS["premium"],
+                        key=f"{agent}_model",
+                        index=AVAILABLE_MODELS["premium"].index(AGENT_SETTINGS[agent]["model"]) 
+                            if AGENT_SETTINGS[agent]["model"] in AVAILABLE_MODELS["premium"] else 2
+                    )
+                    
+                    st.slider(
+                        "Temperature",
+                        min_value=0.0,
+                        max_value=1.0,
+                        value=AGENT_SETTINGS[agent]["temperature"],
+                        step=0.1,
+                        key=f"{agent}_temp"
+                    )
+                    
+                    st.number_input(
+                        "Max Tokens",
+                        min_value=100,
+                        max_value=4000,
+                        value=AGENT_SETTINGS[agent]["max_tokens"],
+                        step=100,
+                        key=f"{agent}_tokens"
+                    )
+    else:
+        # Free tier configuration
+        st.sidebar.subheader("HuggingFace API Key")
+        hf_api_key = st.sidebar.text_input(
+            "Enter your HuggingFace API key",
+            type="password",
+            help="Get a free API key from huggingface.co",
+            key="huggingface_api_key"
+        )
+        
+        # Free tier model selection
+        st.sidebar.subheader("Model Selection")
+        selected_model = st.sidebar.selectbox(
+            "Select Free Model",
+            options=AVAILABLE_MODELS["free"],
+            index=0,
+            help="Select a HuggingFace model to use"
+        )
+        FREE_TIER_SETTINGS["model"] = selected_model
+        
+        # Update all agents to use the selected free model
+        for agent in AGENT_SETTINGS:
+            AGENT_SETTINGS[agent].update(FREE_TIER_SETTINGS)
     
     # Agent Enable/Disable Section
     st.sidebar.subheader("Enable/Disable Agents")
@@ -277,39 +319,6 @@ def config_sidebar():
         value=st.session_state.enabled_agents["debate_agent"],
         help="Creates pros and cons analysis"
     )
-    
-    # Model Configuration Section
-    st.sidebar.subheader("Model Settings")
-    
-    # Create tabs for different agent configurations
-    agent_tabs = st.sidebar.tabs(["News", "Reflection", "Debate", "Coordinator"])
-    
-    for agent, tab in zip(AGENT_SETTINGS.keys(), agent_tabs):
-        with tab:
-            st.selectbox(
-                "Model",
-                options=["gpt-3.5-turbo", "gpt-4", "gpt-4o-mini", "gpt-4o"],
-                key=f"{agent}_model",
-                index=["gpt-3.5-turbo", "gpt-4", "gpt-4o-mini", "gpt-4o"].index(AGENT_SETTINGS[agent]["model"]) if AGENT_SETTINGS[agent]["model"] in ["gpt-3.5-turbo", "gpt-4", "gpt-4o-mini", "gpt-4o"] else 2
-            )
-            
-            st.slider(
-                "Temperature",
-                min_value=0.0,
-                max_value=1.0,
-                value=AGENT_SETTINGS[agent]["temperature"],
-                step=0.1,
-                key=f"{agent}_temp"
-            )
-            
-            st.number_input(
-                "Max Tokens",
-                min_value=100,
-                max_value=4000,
-                value=AGENT_SETTINGS[agent]["max_tokens"],
-                step=100,
-                key=f"{agent}_tokens"
-            )
     
     # Trading Settings Section
     st.sidebar.subheader("Trading Settings")
@@ -351,14 +360,6 @@ def main():
     # Get configuration from sidebar
     config_sidebar()
     
-    # Check for API key
-    if not st.session_state.get("openai_api_key"):
-        st.error("Please enter your OpenAI API key in the sidebar.")
-        st.stop()
-    
-    # Set the API key for this session
-    os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
-    
     # Symbol selection in main page
     st.markdown('<p class="big-font">Select Symbols to Analyze</p>', unsafe_allow_html=True)
     selected_symbols = st.multiselect(
@@ -380,6 +381,32 @@ def main():
         with col:
             fig = plot_stock_price(symbol)
             st.plotly_chart(fig, use_container_width=True)
+
+    # Check for API keys based on tier
+    if st.session_state.tier == "Premium":
+        if not st.session_state.get("openai_api_key"):
+            st.error("Please enter your OpenAI API key in the sidebar to use the premium tier.")
+            st.stop()
+        os.environ["OPENAI_API_KEY"] = st.session_state.openai_api_key
+    else:
+        if not st.session_state.get("huggingface_api_key"):
+            st.error("""
+                Please enter your HuggingFace API key in the sidebar to use the free tier.
+                
+                To get a free API key:
+                1. Visit huggingface.co
+                2. Create a free account
+                3. Go to Settings > Access Tokens
+                4. Create a new token
+                
+                Alternatively, you can use the Premium tier with an OpenAI API key.
+            """)
+            st.stop()
+        os.environ["HUGGINGFACE_API_KEY"] = st.session_state.huggingface_api_key
+        
+        # Update all agents to use free tier settings
+        for agent in AGENT_SETTINGS:
+            AGENT_SETTINGS[agent].update(FREE_TIER_SETTINGS)
     
     # Create placeholder for real-time updates
     agent_outputs = st.empty()
@@ -387,35 +414,34 @@ def main():
     # Analysis button
     if st.button("Run Analysis", type="primary"):
         with st.spinner("Running AI analysis..."):
-            # Initialize coordinator
-            coordinator = CoordinatorAgent(AGENT_SETTINGS["coordinator_agent"])
-            
-            # Prepare data
-            market_data = get_market_data(selected_symbols)
-            historical_decisions = load_historical_decisions()
-            
-            # Create analysis context
-            analysis_context = {
-                "symbols": selected_symbols,
-                "market_data": market_data,
-                "historical_decisions": historical_decisions,
-                "timestamp": datetime.now().isoformat(),
-                "proposed_action": {
-                    "type": "ANALYSIS",
-                    "symbols": selected_symbols,
-                    "risk_level": TRADING_SETTINGS["risk_tolerance"]
-                },
-                "enabled_agents": st.session_state.enabled_agents  # Pass enabled agents configuration
-            }
-            
-            # Get trading decision
             try:
+                # Initialize coordinator
+                coordinator = CoordinatorAgent(AGENT_SETTINGS["coordinator_agent"])
+                
+                # Prepare data
+                market_data = get_market_data(selected_symbols)
+                historical_decisions = load_historical_decisions()
+                
+                # Create analysis context
+                analysis_context = {
+                    "symbols": selected_symbols,
+                    "market_data": market_data,
+                    "historical_decisions": historical_decisions,
+                    "timestamp": datetime.now().isoformat(),
+                    "proposed_action": {
+                        "type": "ANALYSIS",
+                        "symbols": selected_symbols,
+                        "risk_level": TRADING_SETTINGS["risk_tolerance"]
+                    },
+                    "enabled_agents": st.session_state.enabled_agents
+                }
+                
                 # Initialize container for agent outputs
                 with agent_outputs.container():
                     st.markdown('<p class="big-font">Agent Outputs</p>', unsafe_allow_html=True)
+
                     
                     # Only show enabled agent outputs
-                    print(st.session_state.enabled_agents)
                     if st.session_state.enabled_agents["news_agent"]:
                         news_analysis = coordinator.news_agent.analyze({
                             "symbols": selected_symbols,
@@ -458,7 +484,30 @@ def main():
                         ),
                         "final_decision": result
                     })
-                
+            
+            except ConnectionError as e:
+                st.error(f"""
+                    Connection Error: {str(e)}
+                    
+                    If using the free tier, please ensure Ollama is installed and running:
+                    1. Visit https://ollama.ai
+                    2. Download and install Ollama
+                    3. Run Ollama on your system
+                    4. Restart this application
+                    
+                    Alternatively, you can use the Premium tier with an OpenAI API key.
+                """)
+            except RuntimeError as e:
+                st.error(f"""
+                    Runtime Error: {str(e)}
+                    
+                    If using the free tier with Ollama:
+                    1. Check if the selected model is valid
+                    2. Ensure you have sufficient disk space
+                    3. Try a different model from the dropdown
+                    
+                    Alternatively, you can use the Premium tier with an OpenAI API key.
+                """)
             except Exception as e:
                 st.error(f"Error during analysis: {str(e)}")
 
