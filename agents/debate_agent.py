@@ -234,11 +234,15 @@ class DebateAgent(BaseAgent):
             return confidence
 
         total_rounds = max(r["round"] for r in debate_rounds)
+        expert_roles = ["fundamental", "technical", "risk"]
+        
         sum_of_weights = total_rounds * (total_rounds + 1) / 2.0
-
         increments = 0.0 
 
-        expert_roles = ["fundamental", "technical", "risk"]
+        domain_positive_terms = ['strong momentum', 'investor confidence', 'reinforcing a positive outlook',
+                                 'upward momentum', 'robust interest', 'healthy demand', 'resilience', 'favorable outlook']
+        domain_negative_terms = ['regulatory scrutiny', 'downward movement', 'selling pressure', 'challenges', 'volatility', 'pressure']
+
         for round_num in range(1, total_rounds + 1):
             current_round_experts = [r for r in debate_rounds if r["round"] == round_num and r["perspective"] in expert_roles]
 
@@ -246,13 +250,15 @@ class DebateAgent(BaseAgent):
                 continue
 
             stock_stances = {}
+            all_arguments_text = [] 
+            
             for entry in current_round_experts:
                 perspective = entry["perspective"]
                 lines = entry["arguments"].strip().split('\n')
                 for line in lines:
-                    line = line.strip()
-                    if line.lower().startswith("stock:"):
-                        parts = line.split('-', 1)
+                    line_stripped = line.strip()
+                    if line_stripped.lower().startswith("stock:"):
+                        parts = line_stripped.split('-', 1)
                         if len(parts) != 2:
                             continue
                         stock_part = parts[0].replace("Stock:", "").strip()
@@ -263,23 +269,31 @@ class DebateAgent(BaseAgent):
                             stance = "bearish"
                         else:
                             stance = "neutral"
+
                         if stock_part not in stock_stances:
                             stock_stances[stock_part] = {}
                         stock_stances[stock_part][perspective] = stance
+                    all_arguments_text.append(line_stripped.lower())
 
-            round_weight = round_num 
+            round_weight = round_num
             for symbol, stances in stock_stances.items():
                 if len(stances) == 3:
                     f_stance = stances.get("fundamental", "neutral")
                     t_stance = stances.get("technical", "neutral")
                     r_stance = stances.get("risk", "neutral")
-
                     if f_stance == t_stance == r_stance and f_stance in ["bullish", "bearish"]:
-                        increments += 0.15 * round_weight
+                        increments += 0.1 * round_weight
                     else:
-                        increments -= 0.1 * round_weight
+                        increments -= 0.05 * round_weight
+            
+            text_joined = " ".join(all_arguments_text)
+            domain_positive_count = sum(term in text_joined for term in domain_positive_terms)
+            domain_negative_count = sum(term in text_joined for term in domain_negative_terms)
+            increments += 0.005 * domain_positive_count * round_weight
+            increments -= 0.005 * domain_negative_count * round_weight
 
         confidence += increments / sum_of_weights
 
         confidence = max(0.0, min(1.0, confidence))
         return confidence
+
