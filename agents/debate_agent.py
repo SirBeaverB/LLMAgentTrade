@@ -8,25 +8,35 @@ class DebateAgent(BaseAgent):
         self.debate_rounds = 3
         self.roles = [
             {
+                "name": "always_bull",
+                "description": """You are an Extreme Bull Analyst who always chooses Bullish stance for each stock, regardless of conditions.
+                                You must explicitly address (refute or justify) the points in the short-term memory from the previous round that contradict bullish stances or reinforce them."""
+            },
+            {
+                "name": "always_bear",
+                "description": """You are an Extreme Bear Analyst who always chooses Bearish stance for each stock, regardless of conditions.
+                                You must explicitly address (refute or justify) the points in the short-term memory from the previous round that contradict bearish stances or reinforce them."""
+            },
+            {
                 "name": "fundamental",
                 "description": """You are a Fundamental Analyst focusing on macroeconomic indicators,
                                 company financials, sector trends, and other fundamental factors.
-                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
-                                Argue briefly and directly."""
+                                In each round, you may choose Bullish or Bearish stance for each stock.
+                                You must explicitly address (refute or justify) the points in the short-term memory from the previous round that contradict your stance or reinforce it."""
             },
             {
                 "name": "technical",
                 "description": """You are a Technical Analyst focusing on price trends, chart patterns,
                                 technical indicators, and volume analysis.
-                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
-                                Argue briefly and directly."""
+                                In each round, you may choose Bullish or Bearish stance for each stock.
+                                You must explicitly address (refute or justify) the points in the short-term memory from the previous round that contradict your stance or reinforce it."""
             },
             {
                 "name": "risk",
                 "description": """You are a Risk Analyst focusing on potential risks, uncertainties,
                                 volatility, regulatory changes, and market sentiment shifts.
-                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
-                                Argue briefly and directly."""
+                                In each round, you may choose Bullish or Bearish stance for each stock.
+                                You must explicitly address (refute or justify) the points in the short-term memory from the previous round that contradict your stance or reinforce it."""
             }
         ]
         self.memory_summarizer = MemorySummaryAgent(config=config)
@@ -61,16 +71,24 @@ class DebateAgent(BaseAgent):
                 if round_num == 0:
                     role = role_info["description"]
                 else:
-                    role = f"You are the {role_info['name']} analyst. Continue focusing on your domain. Remember you can choose Bullish or Bearish freely for each stock."
+                    # 修改后的描述，每一轮都允许改变观点，并要求对上轮论点进行回应
+                    role = f"""You are the {role_info['name']} analyst. Continue focusing on your domain.
+                               You may change Bullish/Bearish stance freely this round.
+                               You must explicitly refute or support previous round's differing opinions from the short-term memory.
+                               If you maintain your previous stance, justify it against the arguments in short-term memory.
+                               If you change your stance, explain why you changed in response to previous arguments.
+                               """
+
                 perspective_name = role_info["name"]
 
                 stock_instructions = "\n".join(
                     [f"{i+1}. {symbol}: {market_data[symbol]}" for i, symbol in enumerate(stocks)]
                 )
 
+                # 修改的Prompt：在Instructions中明确要求参考short-term memory，并对上轮中与自己观点不符的观点进行反驳或解释。
                 content = f"""
                 Round {round_num + 1} of debate ({perspective_name.upper()}):
-            
+
                 Market Data for each stock:
                 {stock_instructions}
 
@@ -87,8 +105,9 @@ class DebateAgent(BaseAgent):
                 {self._format_previous_rounds(debate_rounds)}
 
                 Instructions:
-                - For each stock listed above, choose either Bullish or Bearish stance.
-                - Then provide a short but specific viewpoint (4-5 sentences max) for that stock.
+                - For each stock listed above, choose either Bullish or Bearish stance. You may change your stance from previous rounds.
+                - You must explicitly address (refute or justify) viewpoints from the Short-term Memory that contradict your stance or reinforce it.
+                - Provide a short but specific viewpoint (4-5 sentences max) referencing these arguments.
                 - Format the output so that for each stock you produce exactly one line:
                     "Stock: SYMBOL - Bullish(or Bearish) Your short viewpoint"
                 - Do this in the same order as the stocks are listed.
@@ -104,19 +123,12 @@ class DebateAgent(BaseAgent):
 
             debate_rounds.extend(round_results)
 
+            # 从本轮的论点提取立场
             stock_stances = self._extract_stock_stances(round_results, stocks)
 
-            all_same_for_all_stocks = True
-            for s in stocks:
-                s_stance_set = set(stock_stances[s])
-                if len(s_stance_set) > 1:
-                    all_same_for_all_stocks = False
-               
+            # 移除原有的提前终止逻辑，不再检查是否所有观点一致
+            # 原逻辑删除（下方是原位置的逻辑，现在已删除）
 
-                if all_same_for_all_stocks:
-                    break
-
-        
             last_round_num = round_results[-1]['round']
             this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
             round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
@@ -153,7 +165,7 @@ class DebateAgent(BaseAgent):
 
     def _synthesize_debate(self, debate_rounds: List[Dict[str, Any]]) -> str:
         role = """You are a senior market strategist tasked with synthesizing insights 
-                    from three specialized analysts (fundamental, technical, and risk) for multiple stocks."""
+                    from five specialized analysts (fundamental, technical, risk, always_bull, always_bear) for multiple stocks."""
         
         content = f"""
         Synthesize the following debate rounds into a final analysis:
@@ -170,7 +182,7 @@ class DebateAgent(BaseAgent):
         Instructions:
         - Provide a balanced final analysis for each stock considered.
         - For each stock, mention if there was more Bullish or Bearish consensus.
-        - Provide a final recommendation considering all perspectives and risk/reward.
+        - Provide a final recommendation considering all perspectives, including the extreme bull/bear, and overall risk/reward.
         """
 
         return self._create_prompt(role, content)
