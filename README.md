@@ -28,7 +28,7 @@ Access the deployed version at: [Multi-Agent Quants Web App](https://multi-agent
 1. Clone the repository:
 ```bash
 git clone https://github.com/ZhengxuYan/Multi-Agent-Quants.git
-cd LLMAgentTrade
+cd Multi-Agent-Quants
 ```
 
 2. Create and activate a virtual environment:
