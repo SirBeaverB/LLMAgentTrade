@@ -4,6 +4,7 @@ from agents.news_agent import NewsAgent
 from agents.reflection_agent import ReflectionAgent
 from agents.debate_agent import DebateAgent
 from config import AGENT_SETTINGS
+import re
 
 class CoordinatorAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
@@ -43,7 +44,8 @@ class CoordinatorAgent(BaseAgent):
             analyses["news"] = {
                 "news_analysis": "News Agent is disabled",
                 "analyzed_symbols": data.get("symbols", []),
-                "timestamp": data.get("timestamp")
+                "timestamp": data.get("timestamp"),
+                "confidence_score": 0.5
             }
         
         # 2. Then get reflection analysis
@@ -84,12 +86,23 @@ class CoordinatorAgent(BaseAgent):
                 "confidence_score": 0.5
             }
         
+        confidence_scores = {}
+        if enabled_agents.get("news_agent", True):
+            confidence_scores["news"] = analyses["news"].get("confidence_score", 0)
+        if enabled_agents.get("reflection_agent", True):
+            confidence_scores["reflection"] = analyses["reflection"].get("reflection_analysis", {}).get("confidence_score", 0)
+        if enabled_agents.get("debate_agent", True):
+            confidence_scores["debate"] = analyses["debate"].get("confidence_score", 0)
+        
+        weights = self._get_agent_weights(confidence_scores, data.get("historical_decisions", []))
+
         # Synthesize all analyses
         final_decision = self._synthesize_analyses(
             analyses["news"],
             analyses["reflection"],
             analyses["debate"],
-            data
+            data,
+            weights
         )
 
         print(f"Final decision: {final_decision}")
@@ -102,7 +115,8 @@ class CoordinatorAgent(BaseAgent):
                 analyses["news"],
                 analyses["reflection"],
                 analyses["debate"],
-                enabled_agents
+                enabled_agents,
+                weights
             ),
         }
         
@@ -114,7 +128,8 @@ class CoordinatorAgent(BaseAgent):
         news_analysis: Dict[str, Any] | None,
         reflection_analysis: Dict[str, Any] | None,
         debate_analysis: Dict[str, Any] | None,
-        context: Dict[str, Any]
+        context: Dict[str, Any],
+        weights: Dict[str, float]
     ) -> Dict[str, Any]:
         """Synthesize analyses from all agents into final decision"""
         # Handle None values with default empty dictionaries
@@ -149,6 +164,9 @@ class CoordinatorAgent(BaseAgent):
         
         Market Context:
         {context.get('market_data', {})}
+
+        Agent Weights:
+        {weights}
         
         Provide a final decision addressing:
         1. Decision Summary
@@ -269,29 +287,100 @@ class CoordinatorAgent(BaseAgent):
         news_analysis: Dict[str, Any],
         reflection_analysis: Dict[str, Any],
         debate_analysis: Dict[str, Any],
-        enabled_agents: Dict[str, bool]
+        enabled_agents: Dict[str, bool],
+        weights: Dict[str, float]
     ) -> float:
         """Calculate overall confidence score based on enabled analyses"""
-        confidence_scores = []
+        weighted_scores = []
         total_weight = 0
         
         # Add debate confidence if enabled
         if enabled_agents.get("debate_agent", True):
-            confidence_scores.append(debate_analysis.get("confidence_score", 0) * 0.5)
-            total_weight += 0.5
+            debate_weight = weights.get("debate", 0.33)
+            debate_confidence = debate_analysis.get("confidence_score", 0)
+            weighted_scores.append(debate_confidence * debate_weight)
+            total_weight += debate_weight
         
         # Add reflection confidence if enabled
         if enabled_agents.get("reflection_agent", True):
-            reflection_score = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0) * 0.3
-            confidence_scores.append(reflection_score)
-            total_weight += 0.3
+            reflection_weight = weights.get("reflection", 0.34)
+            reflection_confidence = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0)
+            weighted_scores.append(reflection_confidence * reflection_weight)
+            total_weight += reflection_weight
         
         # Add news confidence if enabled
         if enabled_agents.get("news_agent", True):
-            confidence_scores.append(0.2)  # Base confidence from news analysis
-            total_weight += 0.2
+            news_weight = weights.get("news", 0.33)
+            news_confidence = news_analysis.get("confidence_score", 0)
+            weighted_scores.append(news_confidence * news_weight)
+            total_weight += news_weight
         
         # Calculate weighted average, ensuring we don't divide by zero
         if total_weight > 0:
-            return sum(confidence_scores) * (1 / total_weight)
+            # Normalize weights if not all agents are enabled
+            return sum(weighted_scores) / total_weight
         return 0.5  # Default confidence if all agents are disabled
+
+    def _get_agent_weights(self, confidence_scores: Dict[str, float], historical_decisions: List) -> Dict[str, float]:
+        """
+        Calculate weights for each agent based on their confidence scores and historical performance.
+        
+        Args:
+            confidence_scores: Dictionary of agent confidence scores
+            historical_decisions: List of historical trading decisions and their outcomes
+            
+        Returns:
+            Dictionary of weights for each agent (summing to 1.0)
+        """
+        default_weights = {
+            'news': 0.33,
+            'reflection': 0.34,
+            'debate': 0.33
+        }
+
+        # Create prompt for weight calculation
+        role = """You are a master trading strategist responsible for determining the optimal weights 
+        for each trading agent. Analyze the confidence scores and historical performance to suggest 
+        weights that will maximize trading success. Return only the weights in this format:
+        news=X.XX,reflection=X.XX,debate=X.XX (weights must sum to 1.0)"""
+
+        content = f"""
+        Based on the following information, suggest optimal weights for each agent:
+
+        Current Confidence Scores:
+        {confidence_scores}
+
+        Recent Historical Decisions (last 5):
+        {historical_decisions[-5:] if historical_decisions else 'No historical data available'}
+
+        Provide weights that sum to 1.0 in the exact format:
+        news=X.XX,reflection=X.XX,debate=X.XX
+        """
+
+        try:
+            response = self._create_prompt(role, content)
+            
+            # Parse weights from response
+            weights = {}
+            # Look for a line that matches our expected format
+            weight_pattern = r'^news=\d*\.?\d+,reflection=\d*\.?\d+,debate=\d*\.?\d+$'
+            for line in response.strip().split('\n'):
+                line = line.strip()
+                if re.match(weight_pattern, line):
+                    weight_line = line
+                    for pair in weight_line.split(','):
+                        agent, weight = pair.split('=')
+                        weights[agent.strip()] = float(weight.strip())
+                    break
+            
+            # Validate weights
+            total_weight = sum(weights.values())
+            if abs(total_weight - 1.0) > 0.01 or any(w < 0 for w in weights.values()):
+                print(f"Warning: Invalid weights received: {weights}. Using default weights.")
+                return default_weights
+                
+            return weights
+            
+        except Exception as e:
+            print(f"Error calculating weights: {str(e)}. Using default weights.")
+            return default_weights

@@ -205,10 +205,14 @@ class SystemEvaluator:
                 results['system_performance'][symbol] = {'response_time': 0.0, 'confidence_score': 0.0}
                 results['technical_reliability'][symbol] = {'success_rate': 0.0, 'stability_score': 0.0}
                 results['performance_metrics'][symbol] = {
+                    'total_return': 0.0,
                     'sharpe_ratio': 0.0,
+                    'volatility': 0.0,
                     'max_drawdown': 0.0,
-                    'max_drawdown_duration': 0,
-                    'annualized_return': 0.0
+                    'calmar_ratio': 0.0,
+                    'sortino_ratio': 0.0,
+                    'strategy_return': 0.0,
+                    'strategy_sharpe': 0.0
                 }
         
         # Calculate overall metrics
@@ -258,17 +262,16 @@ class SystemEvaluator:
                 'combined_weighted_mean': np.mean(combined_weighted) if combined_weighted else 0.0,
                 'combined_weighted_std': np.std(combined_weighted) if combined_weighted else 0.0,
                 'avg_confidence': np.mean(confidences) if confidences else 0.0,
-                'high_confidence_correct': high_confidence_correct,
                 'total_return': total_return if weighted_accuracies else 0.0,
                 'avg_return_magnitude': avg_magnitude,
                 'num_correct': correct_predictions,
                 'num_valid': num_valid,
-                'success_rate': correct_predictions / num_valid if num_valid > 0 else 0.0
+                'high_confidence_correct': high_confidence_correct
             },
             'debate_quality': {
                 'mean_consensus': np.mean([m['consensus_score'] for m in valid_debates]) if valid_debates else 0.0,
                 'mean_argument_quality': np.mean([m['argument_quality'] for m in valid_debates]) if valid_debates else 0.0,
-                'mean_diversity': np.mean([m['perspective_diversity'] for m in valid_debates]) if valid_debates else 0.0
+                'mean_perspective_diversity': np.mean([m['perspective_diversity'] for m in valid_debates]) if valid_debates else 0.0
             },
             'system_performance': {
                 'mean_response_time': np.mean([m['response_time'] for m in valid_performance]) if valid_performance else 0.0,
@@ -286,7 +289,8 @@ class SystemEvaluator:
         valid_performance = [
             m for m in results['performance_metrics'].values() 
             if isinstance(m, dict) and all(k in m for k in [
-                'sharpe_ratio', 'max_drawdown', 'annualized_return',
+                'sharpe_ratio', 'max_drawdown', 'total_return',
+                'volatility', 'calmar_ratio', 'sortino_ratio',
                 'strategy_return', 'strategy_sharpe'
             ])
         ]
@@ -393,7 +397,15 @@ class SystemEvaluator:
                 # Additional Reliability Metrics
                 'Error_Count': len(reliability_metrics.get('error_types', [])),
                 'Average_Response_Time': reliability_metrics.get('avg_response_time', 0.0),
-                'Response_Time_Stability': reliability_metrics.get('response_time_stability', 0.0)
+                'Response_Time_Stability': reliability_metrics.get('response_time_stability', 0.0),
+                'Total_Return': results['performance_metrics'].get(symbol, {}).get('total_return', 0.0),
+                'Sharpe_Ratio': results['performance_metrics'].get(symbol, {}).get('sharpe_ratio', 0.0),
+                'Volatility': results['performance_metrics'].get(symbol, {}).get('volatility', 0.0),
+                'Max_Drawdown': results['performance_metrics'].get(symbol, {}).get('max_drawdown', 0.0),
+                'Calmar_Ratio': results['performance_metrics'].get(symbol, {}).get('calmar_ratio', 0.0),
+                'Sortino_Ratio': results['performance_metrics'].get(symbol, {}).get('sortino_ratio', 0.0),
+                'Strategy_Return': results['performance_metrics'].get(symbol, {}).get('strategy_return', 0.0),
+                'Strategy_Sharpe': results['performance_metrics'].get(symbol, {}).get('strategy_sharpe', 0.0)
             }
             results_data.append(symbol_data)
         
@@ -850,12 +862,19 @@ def print_summary(results: Dict[str, Any]):
     logging.info("\nEvaluation Summary:")
     logging.info("==================")
     
-    num_valid = results['overall_metrics']['signal_accuracy']['num_valid']
-    num_correct = results['overall_metrics']['signal_accuracy']['num_correct']
-    high_conf_correct = results['overall_metrics']['signal_accuracy']['high_confidence_correct']
-    total_symbols = results['evaluation_params']['num_symbols']
+    # Safely get metrics with defaults
+    overall_metrics = results.get('overall_metrics', {})
+    signal_accuracy = overall_metrics.get('signal_accuracy', {})
+    debate_quality = overall_metrics.get('debate_quality', {})
+    system_performance = overall_metrics.get('system_performance', {})
+    technical_reliability = overall_metrics.get('technical_reliability', {})
     
-    # Create summary dictionary
+    num_valid = signal_accuracy.get('num_valid', 0)
+    num_correct = signal_accuracy.get('num_correct', 0)
+    high_conf_correct = signal_accuracy.get('high_confidence_correct', 0)
+    total_symbols = results.get('evaluation_params', {}).get('num_symbols', 0)
+    
+    # Create summary dictionary with safe gets
     summary = {
         'evaluation_coverage': {
             'valid_evaluations': num_valid,
@@ -865,24 +884,24 @@ def print_summary(results: Dict[str, Any]):
         'signal_accuracy': {
             'num_valid_evaluations': num_valid,
             'binary_accuracy': {
-                'mean': results['overall_metrics']['signal_accuracy']['binary_mean'],
-                'std': results['overall_metrics']['signal_accuracy']['binary_std']
+                'mean': signal_accuracy.get('binary_mean', 0.0),
+                'std': signal_accuracy.get('binary_std', 0.0)
             },
             'weighted_accuracy': {
-                'mean': results['overall_metrics']['signal_accuracy']['weighted_mean'],
-                'std': results['overall_metrics']['signal_accuracy']['weighted_std']
+                'mean': signal_accuracy.get('weighted_mean', 0.0),
+                'std': signal_accuracy.get('weighted_std', 0.0)
             },
             'confidence_weighted': {
-                'mean': results['overall_metrics']['signal_accuracy']['confidence_weighted_mean'],
-                'std': results['overall_metrics']['signal_accuracy']['confidence_weighted_std']
+                'mean': signal_accuracy.get('confidence_weighted_mean', 0.0),
+                'std': signal_accuracy.get('confidence_weighted_std', 0.0)
             },
             'combined_weighted': {
-                'mean': results['overall_metrics']['signal_accuracy']['combined_weighted_mean'],
-                'std': results['overall_metrics']['signal_accuracy']['combined_weighted_std']
+                'mean': signal_accuracy.get('combined_weighted_mean', 0.0),
+                'std': signal_accuracy.get('combined_weighted_std', 0.0)
             },
-            'average_confidence': results['overall_metrics']['signal_accuracy']['avg_confidence'],
-            'total_return': results['overall_metrics']['signal_accuracy']['total_return'],
-            'average_return_magnitude': results['overall_metrics']['signal_accuracy']['avg_return_magnitude'],
+            'average_confidence': signal_accuracy.get('avg_confidence', 0.0),
+            'total_return': signal_accuracy.get('total_return', 0.0),
+            'average_return_magnitude': signal_accuracy.get('avg_return_magnitude', 0.0),
             'correct_predictions': {
                 'count': num_correct,
                 'total': num_valid,
@@ -895,98 +914,96 @@ def print_summary(results: Dict[str, Any]):
             }
         },
         'debate_quality': {
-            'mean_consensus': results['overall_metrics']['debate_quality']['mean_consensus'],
-            'mean_argument_quality': results['overall_metrics']['debate_quality']['mean_argument_quality'],
-            'mean_perspective_diversity': results['overall_metrics']['debate_quality']['mean_diversity']
+            'mean_consensus': debate_quality.get('mean_consensus', 0.0),
+            'mean_argument_quality': debate_quality.get('mean_argument_quality', 0.0),
+            'mean_perspective_diversity': debate_quality.get('mean_perspective_diversity', 0.0)
         },
         'system_performance': {
-            'mean_response_time': results['overall_metrics']['system_performance']['mean_response_time'],
-            'mean_confidence': results['overall_metrics']['system_performance']['mean_confidence'],
-            'total_api_calls': results['overall_metrics']['system_performance']['total_api_calls']
+            'mean_response_time': system_performance.get('mean_response_time', 0.0),
+            'mean_confidence': system_performance.get('mean_confidence', 0.0),
+            'total_api_calls': system_performance.get('total_api_calls', 0)
         },
         'technical_reliability': {
-            'overall_success_rate': results['overall_metrics']['technical_reliability']['overall_success_rate'],
-            'mean_stability_score': results['overall_metrics']['technical_reliability']['mean_stability'],
-            'error_types': results['overall_metrics']['technical_reliability']['error_types']
+            'overall_success_rate': technical_reliability.get('overall_success_rate', 0.0),
+            'mean_stability_score': technical_reliability.get('mean_stability', 0.0),
+            'error_types': technical_reliability.get('error_types', [])
         }
     }
     
     # Add performance metrics to logging output
-    if 'performance' in results['overall_metrics']:
-        perf = results['overall_metrics']['performance']
+    if 'performance' in overall_metrics:
+        perf = overall_metrics['performance']
         logging.info("\nPerformance Metrics:")
         logging.info("-------------------")
         
         # Asset Performance
         logging.info("\nAsset Performance:")
-        logging.info(f"Annual Rate of Return (ARR):")
-        logging.info(f"  - Mean: {perf['mean_arr']:.2%}")
-        logging.info(f"  - Best: {perf['best_arr']:.2%}")
+        logging.info(f"Total Return:")
+        logging.info(f"  - Mean: {perf.get('mean_return', 0.0):.2%}")
+        logging.info(f"  - Best: {perf.get('best_return', 0.0):.2%}")
         
         logging.info(f"\nRisk-Adjusted Returns:")
         logging.info(f"Sharpe Ratio:")
-        logging.info(f"  - Mean: {perf['mean_sharpe_ratio']:.2f}")
-        logging.info(f"  - Best: {perf['best_sharpe_ratio']:.2f}")
+        logging.info(f"  - Mean: {perf.get('mean_sharpe_ratio', 0.0):.2f}")
+        logging.info(f"  - Best: {perf.get('best_sharpe_ratio', 0.0):.2f}")
         
         logging.info(f"Sortino Ratio:")
-        logging.info(f"  - Mean: {perf['mean_sortino_ratio']:.2f}")
-        logging.info(f"  - Best: {perf['best_sortino_ratio']:.2f}")
+        logging.info(f"  - Mean: {perf.get('mean_sortino_ratio', 0.0):.2f}")
+        logging.info(f"  - Best: {perf.get('best_sortino_ratio', 0.0):.2f}")
         
         logging.info(f"Calmar Ratio:")
-        logging.info(f"  - Mean: {perf['mean_calmar_ratio']:.2f}")
-        logging.info(f"  - Best: {perf['best_calmar_ratio']:.2f}")
+        logging.info(f"  - Mean: {perf.get('mean_calmar_ratio', 0.0):.2f}")
+        logging.info(f"  - Best: {perf.get('best_calmar_ratio', 0.0):.2f}")
         
         logging.info(f"\nRisk Metrics:")
         logging.info(f"Volatility:")
-        logging.info(f"  - Mean: {perf['mean_volatility']:.2%}")
+        logging.info(f"  - Mean: {perf.get('mean_volatility', 0.0):.2%}")
         
         logging.info(f"Maximum Drawdown:")
-        logging.info(f"  - Mean: {perf['mean_max_drawdown']:.2%}")
-        logging.info(f"  - Worst: {perf['worst_drawdown']:.2%}")
+        logging.info(f"  - Mean: {perf.get('mean_max_drawdown', 0.0):.2%}")
+        logging.info(f"  - Worst: {perf.get('worst_drawdown', 0.0):.2%}")
         
         # Strategy Performance
         logging.info("\nStrategy Performance:")
         logging.info(f"Strategy Returns:")
-        logging.info(f"  - Mean: {perf['mean_strategy_return']:.2%}")
-        logging.info(f"  - ARR: {perf['mean_strategy_arr']:.2%}")
-        logging.info(f"  - Sharpe: {perf['mean_strategy_sharpe']:.2f}")
+        logging.info(f"  - Mean: {perf.get('mean_strategy_return', 0.0):.2%}")
+        logging.info(f"  - Sharpe: {perf.get('mean_strategy_sharpe', 0.0):.2f}")
         
         # Add performance metrics to summary dictionary
         summary['performance_metrics'] = {
             'asset_performance': {
-                'arr': {
-                    'mean': perf['mean_arr'],
-                    'best': perf['best_arr']
+                'total_return': {
+                    'mean': perf.get('mean_return', 0.0),
+                    'best': perf.get('best_return', 0.0)
                 },
                 'risk_adjusted_returns': {
                     'sharpe_ratio': {
-                        'mean': perf['mean_sharpe_ratio'],
-                        'best': perf['best_sharpe_ratio']
+                        'mean': perf.get('mean_sharpe_ratio', 0.0),
+                        'best': perf.get('best_sharpe_ratio', 0.0)
                     },
                     'sortino_ratio': {
-                        'mean': perf['mean_sortino_ratio'],
-                        'best': perf['best_sortino_ratio']
+                        'mean': perf.get('mean_sortino_ratio', 0.0),
+                        'best': perf.get('best_sortino_ratio', 0.0)
                     },
                     'calmar_ratio': {
-                        'mean': perf['mean_calmar_ratio'],
-                        'best': perf['best_calmar_ratio']
+                        'mean': perf.get('mean_calmar_ratio', 0.0),
+                        'best': perf.get('best_calmar_ratio', 0.0)
                     }
                 },
                 'risk_metrics': {
                     'volatility': {
-                        'mean': perf['mean_volatility']
+                        'mean': perf.get('mean_volatility', 0.0)
                     },
                     'max_drawdown': {
-                        'mean': perf['mean_max_drawdown'],
-                        'worst': perf['worst_drawdown']
+                        'mean': perf.get('mean_max_drawdown', 0.0),
+                        'worst': perf.get('worst_drawdown', 0.0)
                     }
                 }
             },
             'strategy_performance': {
                 'returns': {
-                    'mean': perf['mean_strategy_return'],
-                    'arr': perf['mean_strategy_arr'],
-                    'sharpe': perf['mean_strategy_sharpe']
+                    'mean': perf.get('mean_strategy_return', 0.0),
+                    'sharpe': perf.get('mean_strategy_sharpe', 0.0)
                 }
             }
         }
@@ -1011,7 +1028,7 @@ def print_summary(results: Dict[str, Any]):
     logging.info(f"\nDebate Quality:")
     logging.info(f"Mean consensus: {results['overall_metrics']['debate_quality']['mean_consensus']:.2f}")
     logging.info(f"Mean argument quality: {results['overall_metrics']['debate_quality']['mean_argument_quality']:.2f}")
-    logging.info(f"Mean perspective diversity: {results['overall_metrics']['debate_quality']['mean_diversity']:.2f}")
+    logging.info(f"Mean perspective diversity: {results['overall_metrics']['debate_quality']['mean_perspective_diversity']:.2f}")
     
     logging.info(f"\nSystem Performance:")
     logging.info(f"Mean response time: {results['overall_metrics']['system_performance']['mean_response_time']:.2f}s")

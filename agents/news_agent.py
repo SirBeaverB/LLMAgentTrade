@@ -152,7 +152,8 @@ class NewsAgent(BaseAgent):
             "timestamp": timestamp,
             "has_news": bool(news_data['articles'].strip()),
             "sentiment_scores": news_data['sentiment_scores'],
-            "source_breakdown": news_data['source_breakdown']
+            "source_breakdown": news_data['source_breakdown'],
+            "confidence_score": self._calculate_confidence_score(news_data)
         }
         
         self.save_to_memory(analysis_result)
@@ -745,4 +746,89 @@ class NewsAgent(BaseAgent):
         except ValueError:
             # If parsing fails, return current time in UTC
             return datetime.now(pytz.UTC)
+    
+    def _calculate_confidence_score(self, news_data: Dict[str, Any]) -> float:
+        """
+        Calculate confidence score based on news data quality and quantity.
+        
+        Args:
+            news_data: Dictionary containing news articles, sentiment, and source information
+            
+        Returns:
+            float: Confidence score between 0 and 1
+        """
+        try:
+            # Initialize scoring factors
+            factors = {
+                'source_diversity': 0.0,  # Higher score for multiple sources
+                'article_quantity': 0.0,  # Higher score for more articles
+                'source_quality': 0.0,    # Higher score for reliable sources
+                'data_freshness': 0.0,    # Higher score for recent data
+                'sentiment_strength': 0.0  # Higher score for strong sentiment signals
+            }
+            
+            # 1. Source Diversity
+            unique_sources = set()
+            for article in news_data.get('articles', '').split('\n\n'):
+                if 'Source:' in article:
+                    source = article.split('Source:')[1].split('\n')[0].strip()
+                    unique_sources.add(source)
+            
+            factors['source_diversity'] = min(len(unique_sources) / 5, 1.0)  # Normalize to max of 5 sources
+            
+            # 2. Article Quantity
+            article_count = len(news_data.get('articles', '').split('\n\n'))
+            factors['article_quantity'] = min(article_count / 10, 1.0)  # Normalize to max of 10 articles
+            
+            # 3. Source Quality
+            high_quality_sources = {
+                'SEC', 'Alpha Vantage', 'YFinance', 'Bloomberg', 'Reuters', 
+                'Financial Times', 'Wall Street Journal', 'EDGAR'
+            }
+            quality_sources = sum(1 for source in unique_sources if any(qs in source for qs in high_quality_sources))
+            factors['source_quality'] = quality_sources / max(len(unique_sources), 1)
+            
+            # 4. Data Freshness
+            current_time = datetime.now(pytz.UTC)
+            timestamps = []
+            for article in news_data.get('articles', '').split('\n\n'):
+                if 'Published:' in article:
+                    try:
+                        published_str = article.split('Published:')[1].split('\n')[0].strip()
+                        published_time = datetime.fromisoformat(published_str.replace('Z', '+00:00'))
+                        timestamps.append(published_time)
+                    except (ValueError, IndexError):
+                        continue
+            
+            if timestamps:
+                newest_article = max(timestamps)
+                hours_old = (current_time - newest_article).total_seconds() / 3600
+                factors['data_freshness'] = max(0, 1 - (hours_old / 24))  # Normalize to 24 hours
+            
+            # # 5. Sentiment Strength
+            # sentiment_scores = news_data.get('sentiment_scores', {})
+            # if sentiment_scores:
+            #     # Calculate average absolute deviation from neutral (0.5)
+            #     deviations = [abs(score - 0.5) * 2 for score in sentiment_scores.values()]
+            #     factors['sentiment_strength'] = sum(deviations) / len(deviations)
+            
+            # Calculate weighted average of factors
+            weights = {
+                'source_diversity': 0.2,
+                'article_quantity': 0.15,
+                'source_quality': 0.3,
+                'data_freshness': 0.2,
+            }
+            
+            confidence_score = sum(score * weights[factor] for factor, score in factors.items())
+            
+            # Log the factors for debugging
+            self.logger.debug(f"Confidence factors: {factors}")
+            self.logger.debug(f"Final confidence score: {confidence_score}")
+            
+            return confidence_score
+            
+        except Exception as e:
+            self.logger.error(f"Error calculating confidence score: {str(e)}")
+            return 0.5  # Return neutral confidence on error
 

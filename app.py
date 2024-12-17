@@ -570,12 +570,27 @@ def main():
                         })
                         show_agent_output("debate_agent", debate_analysis)
                     
+                    # Get agent weights
+                    confidence_scores = {}
+                    if st.session_state.enabled_agents["news_agent"]:
+                        confidence_scores["news"] = news_analysis.get("confidence_score", 0)
+                    if st.session_state.enabled_agents["reflection_agent"]:
+                        confidence_scores["reflection"] = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0)
+                    if st.session_state.enabled_agents["debate_agent"]:
+                        confidence_scores["debate"] = debate_analysis.get("confidence_score", 0)
+                    
+                    weights = coordinator._get_agent_weights(
+                        confidence_scores,
+                        historical_decisions
+                    )
+                    
                     # Get final decision
                     result = coordinator._synthesize_analyses(
                         news_analysis if st.session_state.enabled_agents["news_agent"] else None,
                         reflection_analysis if st.session_state.enabled_agents["reflection_agent"] else None,
                         debate_analysis if st.session_state.enabled_agents["debate_agent"] else None,
-                        analysis_context
+                        analysis_context,
+                        weights
                     )
                     
                     # Display final results
@@ -585,7 +600,8 @@ def main():
                             news_analysis if st.session_state.enabled_agents["news_agent"] else None,
                             reflection_analysis if st.session_state.enabled_agents["reflection_agent"] else None,
                             debate_analysis if st.session_state.enabled_agents["debate_agent"] else None,
-                            st.session_state.enabled_agents
+                            st.session_state.enabled_agents,
+                            weights
                         ),
                         "final_decision": result
                     })
