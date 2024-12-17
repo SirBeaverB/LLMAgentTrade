@@ -13,6 +13,7 @@ class DebateAgent(BaseAgent):
                                     company financials, sector trends, and other fundamental factors that
                                     influence the asset's intrinsic value. 
                                     Your goal is to provide arguments about the proposed action from a fundamental perspective.
+                                    You can choose your stance (Bullish or Bearish) freely each round.
                                     Argue briefly and directly."""
                 },
                 {
@@ -20,6 +21,7 @@ class DebateAgent(BaseAgent):
                     "description": """You are a Technical Analyst focusing on price trends, chart patterns,
                                     technical indicators, and volume analysis.
                                     Your goal is to provide arguments about the proposed action from a technical perspective.
+                                    You can choose your stance (Bullish or Bearish) freely each round.
                                     Argue briefly and directly."""
                 },
                 {
@@ -27,6 +29,7 @@ class DebateAgent(BaseAgent):
                     "description": """You are a Risk Analyst focusing on potential risks, uncertainties, 
                                     volatility, regulatory changes, and market sentiment shifts.
                                     Your goal is to provide arguments about the proposed action from a risk management perspective.
+                                    You can choose your stance (Bullish or Bearish) freely each round.
                                     Argue briefly and directly."""
                 }
             ]
@@ -93,12 +96,11 @@ class DebateAgent(BaseAgent):
                 {self._format_previous_rounds(debate_rounds)}
 
                 Instructions:
-                - Review the previous arguments above.
-                - Identify at least one specific point from another perspective that you disagree with or wish to challenge.
-                - Respond in about 4-5 sentences, directly addressing that point and providing your viewpoint.
-                - Maintain your analytical focus ({perspective_name}), but ensure this feels like a debate: challenge or counter a claim.
-                - You can also reinforce or clarify your stance if needed, but do not just repeat your previous points verbatim.
-
+                - At the start of your argument, explicitly state your stance for this round as either Bullish or Bearish.
+                - Present your viewpoint (4-5 sentences).
+                - You can react to previous arguments if they exist, or establish a stance on the action.
+                - If no differing opinions are found, you may also choose a stance and clarify it.
+                - Keep it concise and debate-like.
                 Present your {perspective_name} argument from your perspective clean and straight to the point.
                 """
 
@@ -110,14 +112,38 @@ class DebateAgent(BaseAgent):
                     "arguments": response
                 })
 
-            last_round_num = debate_rounds[-1]['round']
-            this_round_data = [r['arguments'] for r in debate_rounds if r['round'] == last_round_num]
-            round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
-            self.short_term_memory.clear()
-            self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
-            self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
+                round_results = debate_rounds
+                debate_rounds.extend(round_results)
+
+            # 在本轮结束后分析各角色的立场
+                stances = self._extract_stances(round_results)
+                if len(set(stances)) <= 1:
+                # 所有角色立场相同或没有明确相反立场
+                # 既然没有分歧，就提前结束辩论
+                    break
+
+
+                last_round_num = round_results[-1]['round']
+                this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
+                round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
+                self.short_term_memory.clear()
+                self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
+                self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
         
         return debate_rounds
+    
+    def _extract_stances(self, round_data: List[Dict[str, Any]]) -> List[str]:
+        """Extract stances from the debate rounds"""
+        stances = []
+        for r in round_data:
+            text = r['arguments'].lower()
+            if "bullish" in text:
+                stances.append("bullish")
+            elif "bearish" in text:
+                stances.append("bearish")
+            else:
+                stances.append("neutral")
+        return stances
     
     def _synthesize_debate(self, debate_rounds: List[Dict[str, Any]]) -> str:
         """Synthesize the debate rounds into a final analysis"""
