@@ -7,46 +7,33 @@ class DebateAgent(BaseAgent):
         super().__init__(config)
         self.debate_rounds = 3
         self.roles = [
-                {
-                    "name": "fundamental",
-                    "description": """You are a Fundamental Analyst focusing on macroeconomic indicators,
-                                    company financials, sector trends, and other fundamental factors that
-                                    influence the asset's intrinsic value. 
-                                    Your goal is to provide arguments about the proposed action from a fundamental perspective.
-                                    You can choose your stance (Bullish or Bearish) freely each round.
-                                    Argue briefly and directly."""
-                },
-                {
-                    "name": "technical",
-                    "description": """You are a Technical Analyst focusing on price trends, chart patterns,
-                                    technical indicators, and volume analysis.
-                                    Your goal is to provide arguments about the proposed action from a technical perspective.
-                                    You can choose your stance (Bullish or Bearish) freely each round.
-                                    Argue briefly and directly."""
-                },
-                {
-                    "name": "risk",
-                    "description": """You are a Risk Analyst focusing on potential risks, uncertainties, 
-                                    volatility, regulatory changes, and market sentiment shifts.
-                                    Your goal is to provide arguments about the proposed action from a risk management perspective.
-                                    You can choose your stance (Bullish or Bearish) freely each round.
-                                    Argue briefly and directly."""
-                }
-            ]
+            {
+                "name": "fundamental",
+                "description": """You are a Fundamental Analyst focusing on macroeconomic indicators,
+                                company financials, sector trends, and other fundamental factors.
+                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
+                                Argue briefly and directly."""
+            },
+            {
+                "name": "technical",
+                "description": """You are a Technical Analyst focusing on price trends, chart patterns,
+                                technical indicators, and volume analysis.
+                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
+                                Argue briefly and directly."""
+            },
+            {
+                "name": "risk",
+                "description": """You are a Risk Analyst focusing on potential risks, uncertainties,
+                                volatility, regulatory changes, and market sentiment shifts.
+                                You can choose your stance (Bullish or Bearish) freely for each stock each round.
+                                Argue briefly and directly."""
+            }
+        ]
         self.memory_summarizer = MemorySummaryAgent(config=config)
         self.mid_term_memory = []
         self.short_term_memory = []
     
     def analyze(self, data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Conduct an internal debate about trading decisions
-        
-        Args:
-            data: Dictionary containing market data and proposed actions
-            
-        Returns:
-            Dictionary containing debate conclusions and recommendations
-        """
         market_data = data.get("market_data", {})
         proposed_action = data.get("proposed_action", {})
         
@@ -66,6 +53,7 @@ class DebateAgent(BaseAgent):
     
     def _conduct_debate(self, market_data: Dict[str, Any], proposed_action: Dict[str, Any]) -> List[Dict[str, Any]]:
         debate_rounds = []
+        stocks = sorted(market_data.keys())
 
         for round_num in range(self.debate_rounds):
             round_results = []
@@ -73,14 +61,18 @@ class DebateAgent(BaseAgent):
                 if round_num == 0:
                     role = role_info["description"]
                 else:
-                    role = f"You are the {role_info['name']} analyst. Continue focusing on your domain. Remember you can choose Bullish or Bearish freely."
+                    role = f"You are the {role_info['name']} analyst. Continue focusing on your domain. Remember you can choose Bullish or Bearish freely for each stock."
                 perspective_name = role_info["name"]
+
+                stock_instructions = "\n".join(
+                    [f"{i+1}. {symbol}: {market_data[symbol]}" for i, symbol in enumerate(stocks)]
+                )
 
                 content = f"""
                 Round {round_num + 1} of debate ({perspective_name.upper()}):
-                
-                Market Data:
-                {market_data}
+            
+                Market Data for each stock:
+                {stock_instructions}
 
                 Proposed Action:
                 {proposed_action}
@@ -95,10 +87,11 @@ class DebateAgent(BaseAgent):
                 {self._format_previous_rounds(debate_rounds)}
 
                 Instructions:
-                - At the start of your argument, explicitly state your stance for this round as either Bullish or Bearish.
-                - Present your viewpoint (4-5 sentences).
-                - You can react to previous arguments if they exist, or establish a stance on the action.
-                - If no differing opinions are found, you may also choose a stance and clarify it.
+                - For each stock listed above, choose either Bullish or Bearish stance.
+                - Then provide a short viewpoint (1-2 sentences max) for that stock.
+                - Format the output so that for each stock you produce exactly one line:
+                "Stock: SYMBOL - Bullish(or Bearish) Your short viewpoint"
+                - Do this in the same order as the stocks are listed.
                 - Keep it concise and debate-like.
                 """
 
@@ -111,39 +104,56 @@ class DebateAgent(BaseAgent):
 
             debate_rounds.extend(round_results)
 
-            stances = self._extract_stances(round_results)
-            if len(set(stances)) <= 1:
-                break
+            stock_stances = self._extract_stock_stances(round_results, stocks)
 
+            all_same_for_all_stocks = True
+            for s in stocks:
+                s_stance_set = set(stock_stances[s])
+                if len(s_stance_set) > 1:
+                    all_same_for_all_stocks = False
+               
+
+                if all_same_for_all_stocks:
+                    break
+
+        
             last_round_num = round_results[-1]['round']
             this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
             round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
             self.short_term_memory.clear()
             self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
             self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
-        
+
         return debate_rounds
-    
-    def _extract_stances(self, round_data: List[Dict[str, Any]]) -> List[str]:
-        """Extract stances from the debate rounds"""
-        stances = []
+
+
+    def _extract_stock_stances(self, round_data: List[Dict[str, Any]], stocks: List[str]) -> Dict[str, List[str]]:
+        stances_per_stock = {s: [] for s in stocks}
+
         for r in round_data:
-            text = r['arguments'].lower()
-            if "bullish" in text:
-                stances.append("bullish")
-            elif "bearish" in text:
-                stances.append("bearish")
-            else:
-                stances.append("neutral")
-        return stances
-    
+            arguments = r['arguments'].strip().split('\n')
+            for line in arguments:
+                line = line.strip().lower()
+                if line.startswith("stock:"):
+                    parts = line.split('-')
+                    if len(parts) < 2:
+                        continue
+                    symbol_part = parts[0].replace("stock:", "").strip()
+                    stance_part = parts[1].strip()
+                    symbol = symbol_part
+                    if symbol in stances_per_stock:
+                        if stance_part.startswith("bullish"):
+                            stances_per_stock[symbol].append("bullish")
+                        elif stance_part.startswith("bearish"):
+                            stances_per_stock[symbol].append("bearish")
+                        else:
+                            stances_per_stock[symbol].append("neutral")
+
+        return stances_per_stock
+
     def _synthesize_debate(self, debate_rounds: List[Dict[str, Any]]) -> str:
-        """Synthesize the debate rounds into a final analysis"""
-        mid_term_info = self._get_mid_term_info()
-        short_term_info = self._get_short_term_info()
         role = """You are a senior market strategist tasked with synthesizing insights 
-                    from three specialized analysts (fundamental, technical, and risk). 
-                    Combine their perspectives into a balanced and actionable final analysis."""
+                    from three specialized analysts (fundamental, technical, and risk) for multiple stocks."""
         
         content = f"""
         Synthesize the following debate rounds into a final analysis:
@@ -157,13 +167,12 @@ class DebateAgent(BaseAgent):
         Debate History:
         {self._format_previous_rounds(debate_rounds)}
         
-        Provide a balanced analysis addressing:
-        1. Key Points of Agreement
-        2. Major Points of Contention
-        3. Risk-Reward Assessment
-        4. Final Recommendation
+        Instructions:
+        - Provide a balanced final analysis for each stock considered.
+        - For each stock, mention if there was more Bullish or Bearish consensus.
+        - Provide a final recommendation considering all perspectives and risk/reward.
         """
-        
+
         return self._create_prompt(role, content)
     
     def _format_previous_rounds(self, debate_rounds: List[Dict[str, Any]]) -> str:
@@ -188,29 +197,11 @@ class DebateAgent(BaseAgent):
         if not self.short_term_memory:
             return "No short-term memory recorded."
         return self.short_term_memory[-1]
-    
 
-    
     def _calculate_confidence(self, debate_rounds: List[Dict[str, Any]], market_data: Dict[str, Any]) -> float:
-        """
-        Calculate the confidence score based on debate results from three roles (fundamental, technical, risk)
-        and market data.
-
-        Approach:
-        1. Start with a base confidence value.
-        2. Adjust confidence based on market trend.
-        3. Extract arguments from fundamental, technical, and risk perspectives.
-        4. Identify agreements and disagreements by comparing pairs of roles:
-        (fundamental vs technical), (fundamental vs risk), and (technical vs risk).
-        5. Increase confidence for agreements, decrease for disagreements.
-        6. Check for technical consistency signals among these roles.
-        7. Ensure confidence stays within [0.0, 1.0].
-        """
-
         confidence = 0.5
         trend = market_data.get("trend", "flat")
 
-        # Adjust confidence based on market trend
         if trend == "up":
             confidence += 0.1
         elif trend == "down":
@@ -218,12 +209,10 @@ class DebateAgent(BaseAgent):
         else:
             confidence -= 0.02
 
-        # Extract arguments for each role
         fundamental_args = [r['arguments'] for r in debate_rounds if r['perspective'] == 'fundamental']
         technical_args   = [r['arguments'] for r in debate_rounds if r['perspective'] == 'technical']
         risk_args        = [r['arguments'] for r in debate_rounds if r['perspective'] == 'risk']
 
-        # Combine arguments
         all_fundamental_text = " ".join(fundamental_args).lower()
         all_technical_text = " ".join(technical_args).lower()
         all_risk_text = " ".join(risk_args).lower()
@@ -231,22 +220,16 @@ class DebateAgent(BaseAgent):
         agreements = 0
         disagreements = 0
 
-        # A helper function to check agreements/disagreements between two role texts
         def check_pairwise(text_a: str, text_b: str):
             local_agreements = 0
             local_disagreements = 0
 
-            # Example: "mild increase" considered an agreement if both mention it
             if "mild increase" in text_a and "mild increase" in text_b:
                 local_agreements += 1
-
-            # Risk assessment keyword checks
             if "low risk" in text_a and "low risk" in text_b:
                 local_agreements += 1
             elif ("low risk" in text_a and "high risk" in text_b) or ("high risk" in text_a and "low risk" in text_b):
                 local_disagreements += 1
-
-            # Trend disagreement: one sees upward momentum, the other downward pressure
             if "downward pressure" in text_a and "upward momentum" in text_b:
                 local_disagreements += 1
             elif "downward pressure" in text_b and "upward momentum" in text_a:
@@ -254,17 +237,14 @@ class DebateAgent(BaseAgent):
 
             return local_agreements, local_disagreements
 
-        # Compare fundamental vs technical
         a, d = check_pairwise(all_fundamental_text, all_technical_text)
         agreements += a
         disagreements += d
 
-        # Compare fundamental vs risk
         a, d = check_pairwise(all_fundamental_text, all_risk_text)
         agreements += a
         disagreements += d
 
-        # Compare technical vs risk
         a, d = check_pairwise(all_technical_text, all_risk_text)
         agreements += a
         disagreements += d
@@ -272,15 +252,13 @@ class DebateAgent(BaseAgent):
         confidence += (agreements * 0.05)
         confidence -= (disagreements * 0.05)
 
-        # Check if at least two perspectives mention the same technical phrase.
         if ("moving average crossing above price" in all_fundamental_text and
             "moving average crossing above price" in all_technical_text) or \
-        ("moving average crossing above price" in all_fundamental_text and
+           ("moving average crossing above price" in all_fundamental_text and
             "moving average crossing above price" in all_risk_text) or \
-        ("moving average crossing above price" in all_technical_text and
+           ("moving average crossing above price" in all_technical_text and
             "moving average crossing above price" in all_risk_text):
             confidence += 0.03
 
         confidence = max(0.0, min(1.0, confidence))
-
         return confidence
