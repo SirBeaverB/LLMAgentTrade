@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 from agents import BaseAgent
 from agents.debate_memory import MemorySummaryAgent
+import re
 
 class DebateAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
@@ -140,32 +141,39 @@ class DebateAgent(BaseAgent):
 
 
     def _extract_stock_stances(self, round_data: List[Dict[str, Any]], stocks: List[str]) -> Dict[str, List[str]]:
+        """Extract bullish/bearish stances for each stock from debate rounds"""
         stances_per_stock = {s: [] for s in stocks}
-
+        
         for r in round_data:
-            arguments = r['arguments'].strip().split('\n')
+            arguments = r['arguments'].lower().split('\n')
             for line in arguments:
-                line = line.strip().lower()
-                if line.startswith("stock:"):
-                    parts = line.split('-')
-                    if len(parts) < 2:
-                        continue
-                    symbol_part = parts[0].replace("stock:", "").strip()
-                    stance_part = parts[1].strip()
-                    symbol = symbol_part
-                    if symbol in stances_per_stock:
-                        if stance_part.startswith("bullish"):
-                            stances_per_stock[symbol].append("bullish")
-                        elif stance_part.startswith("bearish"):
-                            stances_per_stock[symbol].append("bearish")
-                        else:
-                            stances_per_stock[symbol].append("neutral")
-
+                line = line.strip()
+                
+                # Look for stock signals in various formats
+                for stock in stocks:
+                    if stock.lower() in line:
+                        # Check for bullish/bearish signals
+                        if "bullish" in line:
+                            stances_per_stock[stock].append("bullish")
+                        elif "bearish" in line:
+                            stances_per_stock[stock].append("bearish")
+                        # If signal found, move to next line
+                        break
+        
         return stances_per_stock
 
     def _synthesize_debate(self, debate_rounds: List[Dict[str, Any]]) -> str:
+        """Synthesize debate results into final analysis"""
         role = """You are a senior market strategist tasked with synthesizing insights 
-                    from five specialized analysts (fundamental, technical, risk, always_bull, always_bear) for multiple stocks."""
+                  from three specialized analysts (fundamental, technical, and risk) for multiple stocks."""
+        
+        # Extract final round stances
+        last_round = [r for r in debate_rounds if r['round'] == max(r['round'] for r in debate_rounds)]
+        stocks = set()
+        for r in last_round:
+            for line in r['arguments'].split('\n'):
+                for stock in re.findall(r'[A-Z]{1,5}(?=[\s:,.]|$)', line):
+                    stocks.add(stock)
         
         content = f"""
         Synthesize the following debate rounds into a final analysis:
@@ -180,11 +188,12 @@ class DebateAgent(BaseAgent):
         {self._format_previous_rounds(debate_rounds)}
         
         Instructions:
-        - Provide a balanced final analysis for each stock considered.
-        - For each stock, mention if there was more Bullish or Bearish consensus.
-        - Provide a final recommendation considering all perspectives, including the extreme bull/bear, and overall risk/reward.
+        1. For each stock ({', '.join(sorted(stocks))}), clearly state if the consensus is BULLISH or BEARISH
+        2. Format each stock signal as: "SYMBOL: SIGNAL" (e.g., "AAPL: BULLISH")
+        3. Then provide your detailed analysis
+        4. End with a clear "SIGNALS:" section listing all stock signals
         """
-
+        
         return self._create_prompt(role, content)
     
     def _format_previous_rounds(self, debate_rounds: List[Dict[str, Any]]) -> str:
