@@ -132,7 +132,7 @@ class DebateAgent(BaseAgent):
                 - Format the output so that for each stock you produce exactly one line:
                     "Stock: SYMBOL - Bullish(or Bearish) Your short viewpoint"
                 - Do this in the same order as the stocks are listed.
-                - Keep it concise and debate-like.
+                - Keep it concise and debate-like. Use adjective-rich language to convey confidence and expertise.
                 """
 
                 response = self._create_prompt(role, content)
@@ -239,9 +239,21 @@ class DebateAgent(BaseAgent):
         sum_of_weights = total_rounds * (total_rounds + 1) / 2.0
         increments = 0.0 
 
-        domain_positive_terms = ['strong momentum', 'investor confidence', 'reinforcing a positive outlook',
-                                 'upward momentum', 'robust interest', 'healthy demand', 'resilience', 'favorable outlook']
-        domain_negative_terms = ['regulatory scrutiny', 'downward movement', 'selling pressure', 'challenges', 'volatility', 'pressure']
+        domain_positive_terms = [
+            'strong momentum', 'investor confidence', 'reinforcing a positive outlook', 'upward momentum', 
+            'robust interest', 'healthy demand', 'resilience', 'favorable outlook', 'clearly', 'strongly', 
+            'definitely', 'consistently', 'well-supported', 'firm evidence', 'high conviction', 'no doubt', 
+            'strongly grounded', 'robust evidence', 'unwavering', 'highly credible', 'solid foundation',
+            'conclusive', 'authoritative', 'well-substantiated'
+        ]
+
+        domain_negative_terms = [
+            'regulatory scrutiny', 'downward movement', 'selling pressure', 'challenges', 'volatility', 'pressure',
+            'possibly', 'might', 'unclear', 'uncertain', 'tentative', 'questionable', 'ambiguous', 'unverified', 
+            'guesswork', 'speculation', 'lack of clarity', 'insufficient data', 'doubtfully', 'not guaranteed', 
+            'inconclusive', 'skeptical', 'dubious', 'no clear evidence'
+        ]
+
 
         for round_num in range(1, total_rounds + 1):
             current_round_experts = [r for r in debate_rounds if r["round"] == round_num and r["perspective"] in expert_roles]
