@@ -82,6 +82,8 @@ class CoordinatorAgent(BaseAgent):
             analyses["debate"],
             data
         )
+
+        print(f"Final decision: {final_decision}")
         
         analysis_result = {
             "final_decision": final_decision,
@@ -113,16 +115,16 @@ class CoordinatorAgent(BaseAgent):
 
         role = """You are a master trading strategist responsible for making the final 
         trading decision based on multiple perspectives and analyses. For each symbol,
-        you must provide a clear boolean signal (True for bullish/positive, False for bearish/negative).
+        you must provide a clear BULLISH or BEARISH signal.
         
-        Your response MUST include a section at the end formatted exactly like this:
+        Your response MUST end with a section formatted EXACTLY like this:
         
         SIGNALS:
-        SYMBOL: <symbol1> | SIGNAL: <BULLISH/BEARISH>
-        SYMBOL: <symbol2> | SIGNAL: <BULLISH/BEARISH>
-        ...etc
+        SYMBOL: <symbol1> | SIGNAL: BULLISH
+        SYMBOL: <symbol2> | SIGNAL: BEARISH
         
-        Use BULLISH for positive outlook and BEARISH for negative outlook."""
+        Use ONLY 'BULLISH' or 'BEARISH' as signals - no other variations are allowed.
+        The format must be exact with the pipe character | separating the symbol and signal."""
         
         content = f"""
         Synthesize the following analyses into a final trading decision:
@@ -146,10 +148,13 @@ class CoordinatorAgent(BaseAgent):
         4. Implementation Plan
         5. Monitoring Criteria
         
-        Then, provide clear signals for each symbol:
+        Then, provide clear BULLISH or BEARISH signals for each symbol:
         {', '.join(context.get('symbols', []))}
         
-        Your response MUST end with the signals section formatted exactly as specified above.
+        Your response MUST end with the SIGNALS section formatted exactly as specified above.
+        Each symbol MUST have either BULLISH or BEARISH signal - no other variations allowed.
+        Follow this exact format for each symbol:
+        SYMBOL: <symbol> | SIGNAL: <BULLISH or BEARISH>
         """
         
         response = self._create_prompt(role, content)
@@ -161,37 +166,44 @@ class CoordinatorAgent(BaseAgent):
         # Find the SIGNALS section
         if "SIGNALS:" in response:
             signals_section = response.split("SIGNALS:")[1].strip()
-            signal_lines = signals_section.split('\n')
+            signal_lines = [line.strip() for line in signals_section.split('\n') if line.strip()]
             
             for line in signal_lines:
-                if "SYMBOL:" in line and "SIGNAL:" in line:
-                    # Parse each signal line
+                if "SYMBOL:" in line and "SIGNAL:" in line and "|" in line:
                     try:
-                        symbol_part = line.split("SIGNAL:")[0].split("SYMBOL:")[1].strip()
-                        signal_part = line.split("SIGNAL:")[1].strip()
+                        # Split by | to separate symbol and signal parts
+                        parts = line.split("|")
+                        if len(parts) != 2:
+                            continue
+                            
+                        symbol_part = parts[0].split("SYMBOL:")[1].strip()
+                        signal_part = parts[1].split("SIGNAL:")[1].strip().upper()
                         
-                        # Extract just the symbol (remove any '|' or other characters)
-                        symbol = symbol_part.replace("|", "").strip()
-                        
-                        # Convert signal to boolean
-                        is_bullish = signal_part.upper().strip() == "BULLISH"
+                        # Only accept exact BULLISH or BEARISH signals
+                        if signal_part not in ["BULLISH", "BEARISH"]:
+                            continue
+                            
+                        symbol = symbol_part.strip()
+                        is_bullish = signal_part == "BULLISH"
                         
                         if symbol in symbols:
                             symbol_signals[symbol] = is_bullish
+                            print(f"Parsed signal for {symbol}: {'BULLISH' if is_bullish else 'BEARISH'}")
                     except Exception as e:
+                        print(f"Error parsing signal line: {line}, Error: {str(e)}")
                         continue
         
-        # If any symbols are missing from the parsed signals, analyze the full response
+        # For any missing symbols, use sentiment analysis
         for symbol in symbols:
             if symbol not in symbol_signals:
-                # Look for explicit mentions of the symbol with sentiment
                 symbol_section = self._find_symbol_section(response, symbol)
                 if symbol_section:
-                    # Analyze the section for sentiment
                     is_bullish = self._analyze_sentiment(symbol_section)
                     symbol_signals[symbol] = is_bullish
+                    print(f"Used sentiment analysis for {symbol}: {'BULLISH' if is_bullish else 'BEARISH'}")
                 else:
-                    # Default to neutral/bearish if we can't find clear sentiment
+                    # Default to bearish only if we can't find any mention
+                    print(f"Warning: No signal found for {symbol}, defaulting to bearish")
                     symbol_signals[symbol] = False
         
         return {

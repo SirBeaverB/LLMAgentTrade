@@ -72,6 +72,7 @@ platformdirs==4.3.6
 plotly==5.18.0
 propcache==0.2.1
 protobuf==4.25.5
+psutil==5.9.8
 pyarrow==18.1.0
 pydantic==2.10.3
 pydantic-settings==2.7.0
