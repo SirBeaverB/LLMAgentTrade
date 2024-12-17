@@ -764,7 +764,6 @@ class NewsAgent(BaseAgent):
                 'article_quantity': 0.0,  # Higher score for more articles
                 'source_quality': 0.0,    # Higher score for reliable sources
                 'data_freshness': 0.0,    # Higher score for recent data
-                'sentiment_strength': 0.0  # Higher score for strong sentiment signals
             }
             
             # 1. Source Diversity
