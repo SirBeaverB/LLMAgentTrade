@@ -105,6 +105,7 @@ class SystemEvaluator:
                     "proposed_action": {"type": "ANALYSIS", "symbols": [symbol]},
                     "risk_tolerance": TRADING_SETTINGS["risk_tolerance"],
                     "historical_decisions": historical_decisions,
+                    "lookback_days": lookback_days
                 })
                 end_time = datetime.now()
                 

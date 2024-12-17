@@ -122,8 +122,10 @@ def display_analysis_results(result):
     """Display the analysis results in a structured format"""
     # Display confidence score
     st.markdown('### Analysis Confidence')
-    st.progress(result['confidence_score'])
-    st.write(f"{result['confidence_score']:.2%} confidence in analysis")
+    # Ensure confidence score is between 0 and 1
+    confidence = min(max(result['confidence_score'], 0.0), 1.0)
+    st.progress(confidence)
+    st.write(f"{confidence:.2%} confidence in analysis")
 
     # Display symbol signals
     signals = result['final_decision']['symbol_signals']
@@ -361,17 +363,52 @@ def config_sidebar():
     )
     
     # News Sources Configuration
-    st.sidebar.subheader("News Sources")
-    news_sources = st.sidebar.multiselect(
-        "Select News Sources",
-        options=["reuters.com", "bloomberg.com", "wsj.com", "ft.com", "cnbc.com", "marketwatch.com"],
-        default=NEWS_SOURCES
+    if "news_sources" not in st.session_state:
+        st.session_state.news_sources = [
+            "yfinance",
+            "alpha_vantage",
+            "finnhub",
+            "newsapi",
+            "sec"
+        ]
+    
+    st.session_state.news_sources = st.sidebar.multiselect(
+        "News Sources",
+        options=[
+            "yfinance",
+            "alpha_vantage",
+            "finnhub",
+            "newsapi",
+            "sec"
+        ],
+        default=st.session_state.news_sources,
+        help="Select which news sources to use for analysis"
     )
     
     # Apply Configuration Button
     if st.sidebar.button("Apply Configuration"):
         update_config()
         st.sidebar.success("Configuration updated successfully!")
+
+def parse_timeframe_to_days(timeframe: str) -> int:
+    """Convert timeframe string to number of days"""
+    timeframe = timeframe.lower()
+    if timeframe == "1d":
+        return 1
+    elif timeframe == "1w":
+        return 7
+    elif timeframe == "2w":
+        return 14
+    elif timeframe == "1m":
+        return 30
+    elif timeframe == "3m":
+        return 90
+    elif timeframe == "6m":
+        return 180
+    elif timeframe == "1y":
+        return 365
+    else:
+        return 30  # Default to 1 month
 
 def main():
     st.title("🤖 Multi-Agent Quants - AI Trading Analysis")
@@ -452,7 +489,8 @@ def main():
                         "symbols": selected_symbols,
                         "risk_level": TRADING_SETTINGS["risk_tolerance"]
                     },
-                    "enabled_agents": st.session_state.enabled_agents
+                    "enabled_agents": st.session_state.enabled_agents,
+                    "lookback_days": parse_timeframe_to_days(st.session_state.analysis_timeframe)
                 }
                 
                 # Initialize container for agent outputs
@@ -464,7 +502,9 @@ def main():
                     if st.session_state.enabled_agents["news_agent"]:
                         news_analysis = coordinator.news_agent.analyze({
                             "symbols": selected_symbols,
-                            "timestamp": datetime.now().isoformat()
+                            "timestamp": datetime.now().isoformat(),
+                            "lookback_days": parse_timeframe_to_days(st.session_state.analysis_timeframe),
+                            "enabled_sources": st.session_state.news_sources
                         })
                         show_agent_output("news_agent", news_analysis)
                     

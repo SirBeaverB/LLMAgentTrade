@@ -34,7 +34,8 @@ class CoordinatorAgent(BaseAgent):
         if enabled_agents.get("news_agent", True):
             news_analysis = self.news_agent.analyze({
                 "symbols": data.get("symbols", []),
-                "timestamp": data.get("timestamp")
+                "timestamp": data.get("timestamp"),
+                "lookback_days": data.get("lookback_days", 5)
             })
             analyses["news"] = news_analysis
             print(f"News Analysis: {news_analysis}")
@@ -271,18 +272,18 @@ class CoordinatorAgent(BaseAgent):
         
         # Add debate confidence if enabled
         if enabled_agents.get("debate_agent", True):
-            confidence_scores.append(debate_analysis.get("confidence_score", 0) * 0.4)
+            confidence_scores.append(debate_analysis.get("confidence_score", 0) * 0.5)
             total_weight += 0.5
         
         # Add reflection confidence if enabled
         if enabled_agents.get("reflection_agent", True):
-            reflection_score = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0) * 0.35
+            reflection_score = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0) * 0.3
             confidence_scores.append(reflection_score)
             total_weight += 0.3
         
         # Add news confidence if enabled
         if enabled_agents.get("news_agent", True):
-            confidence_scores.append(0.25)  # Base confidence from news analysis
+            confidence_scores.append(0.2)  # Base confidence from news analysis
             total_weight += 0.2
         
         # Calculate weighted average, ensuring we don't divide by zero

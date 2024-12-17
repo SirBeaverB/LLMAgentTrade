@@ -70,10 +70,11 @@ AVAILABLE_MODELS = {
 
 # News Sources Configuration
 NEWS_SOURCES = [
-    "reuters.com",
-    "bloomberg.com",
-    "wsj.com",
-    "ft.com"
+    "yfinance",
+    "alpha_vantage",
+    "finnhub",
+    "newsapi",
+    "sec"
 ]
 
 # Trading Configuration
