@@ -218,8 +218,9 @@ def config_sidebar():
     # Tier Selection
     st.session_state.tier = st.sidebar.radio(
         "Select Tier",
-        ["Free", "Premium"],
-        help="Free tier uses HuggingFace models. Premium tier requires OpenAI API key."
+        ["Premium", "Free"],
+        index=0,
+        help="Premium tier uses OpenAI models. Free tier uses HuggingFace models."
     )
     
     if st.session_state.tier == "Premium":
@@ -489,11 +490,10 @@ def main():
                 st.error(f"""
                     Connection Error: {str(e)}
                     
-                    If using the free tier, please ensure Ollama is installed and running:
-                    1. Visit https://ollama.ai
-                    2. Download and install Ollama
-                    3. Run Ollama on your system
-                    4. Restart this application
+                    If using the free tier, please ensure:
+                    1. You have a valid HuggingFace API key
+                    2. You have a stable internet connection
+                    3. The HuggingFace API service is available
                     
                     Alternatively, you can use the Premium tier with an OpenAI API key.
                 """)
@@ -501,9 +501,9 @@ def main():
                 st.error(f"""
                     Runtime Error: {str(e)}
                     
-                    If using the free tier with Ollama:
+                    If using the free tier:
                     1. Check if the selected model is valid
-                    2. Ensure you have sufficient disk space
+                    2. Verify your HuggingFace API key has the necessary permissions
                     3. Try a different model from the dropdown
                     
                     Alternatively, you can use the Premium tier with an OpenAI API key.
