@@ -65,21 +65,20 @@ class DebateAgent(BaseAgent):
         return analysis_result
     
     def _conduct_debate(self, market_data: Dict[str, Any], proposed_action: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Conduct multiple rounds of debate"""
         debate_rounds = []
-        
+
         for round_num in range(self.debate_rounds):
-            #Iterate over all defined roles (fundamental, technical, and risk) in each round
+            round_results = []
             for role_info in self.roles:
                 if round_num == 0:
                     role = role_info["description"]
                 else:
-                    role = f"You are the {role_info['name']} analyst. Keep focusing on your domain."
+                    role = f"You are the {role_info['name']} analyst. Continue focusing on your domain. Remember you can choose Bullish or Bearish freely."
                 perspective_name = role_info["name"]
-                
-                content = f"""
-                Round {round_num + 1} of debate ({perspective_name.upper()} perspective):
 
+                content = f"""
+                Round {round_num + 1} of debate ({perspective_name.upper()}):
+                
                 Market Data:
                 {market_data}
 
@@ -101,34 +100,27 @@ class DebateAgent(BaseAgent):
                 - You can react to previous arguments if they exist, or establish a stance on the action.
                 - If no differing opinions are found, you may also choose a stance and clarify it.
                 - Keep it concise and debate-like.
-                Present your {perspective_name} argument from your perspective clean and straight to the point.
                 """
 
                 response = self._create_prompt(role, content)
-
-                debate_rounds.append({
+                round_results.append({
                     "round": round_num + 1,
                     "perspective": perspective_name,
                     "arguments": response
                 })
 
-                round_results = debate_rounds
-                debate_rounds.extend(round_results)
+            debate_rounds.extend(round_results)
 
-            # 在本轮结束后分析各角色的立场
-                stances = self._extract_stances(round_results)
-                if len(set(stances)) <= 1:
-                # 所有角色立场相同或没有明确相反立场
-                # 既然没有分歧，就提前结束辩论
-                    break
+            stances = self._extract_stances(round_results)
+            if len(set(stances)) <= 1:
+                break
 
-
-                last_round_num = round_results[-1]['round']
-                this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
-                round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
-                self.short_term_memory.clear()
-                self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
-                self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
+            last_round_num = round_results[-1]['round']
+            this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
+            round_summary = self.memory_summarizer.summarize_speeches(this_round_data)
+            self.short_term_memory.clear()
+            self.memory_summarizer.add_to_short_term_memory(self.short_term_memory, round_summary)
+            self.memory_summarizer.add_to_mid_term_memory(self.mid_term_memory, round_summary)
         
         return debate_rounds
     
