@@ -229,65 +229,57 @@ class DebateAgent(BaseAgent):
 
     def _calculate_confidence(self, debate_rounds: List[Dict[str, Any]], market_data: Dict[str, Any]) -> float:
         confidence = 0.5
-        trend = market_data.get("trend", "flat")
 
-        if trend == "up":
-            confidence += 0.1
-        elif trend == "down":
-            confidence -= 0.05
-        else:
-            confidence -= 0.02
+        if not debate_rounds:
+            return confidence
 
-        fundamental_args = [r['arguments'] for r in debate_rounds if r['perspective'] == 'fundamental']
-        technical_args   = [r['arguments'] for r in debate_rounds if r['perspective'] == 'technical']
-        risk_args        = [r['arguments'] for r in debate_rounds if r['perspective'] == 'risk']
+        total_rounds = max(r["round"] for r in debate_rounds)
+        sum_of_weights = total_rounds * (total_rounds + 1) / 2.0
 
-        all_fundamental_text = " ".join(fundamental_args).lower()
-        all_technical_text = " ".join(technical_args).lower()
-        all_risk_text = " ".join(risk_args).lower()
+        increments = 0.0 
 
-        agreements = 0
-        disagreements = 0
+        expert_roles = ["fundamental", "technical", "risk"]
+        for round_num in range(1, total_rounds + 1):
+            current_round_experts = [r for r in debate_rounds if r["round"] == round_num and r["perspective"] in expert_roles]
 
-        def check_pairwise(text_a: str, text_b: str):
-            local_agreements = 0
-            local_disagreements = 0
+            if len(current_round_experts) < 3:
+                continue
 
-            if "mild increase" in text_a and "mild increase" in text_b:
-                local_agreements += 1
-            if "low risk" in text_a and "low risk" in text_b:
-                local_agreements += 1
-            elif ("low risk" in text_a and "high risk" in text_b) or ("high risk" in text_a and "low risk" in text_b):
-                local_disagreements += 1
-            if "downward pressure" in text_a and "upward momentum" in text_b:
-                local_disagreements += 1
-            elif "downward pressure" in text_b and "upward momentum" in text_a:
-                local_disagreements += 1
+            stock_stances = {}
+            for entry in current_round_experts:
+                perspective = entry["perspective"]
+                lines = entry["arguments"].strip().split('\n')
+                for line in lines:
+                    line = line.strip()
+                    if line.lower().startswith("stock:"):
+                        parts = line.split('-', 1)
+                        if len(parts) != 2:
+                            continue
+                        stock_part = parts[0].replace("Stock:", "").strip()
+                        stance_part = parts[1].strip().lower()
+                        if stance_part.startswith("bullish"):
+                            stance = "bullish"
+                        elif stance_part.startswith("bearish"):
+                            stance = "bearish"
+                        else:
+                            stance = "neutral"
+                        if stock_part not in stock_stances:
+                            stock_stances[stock_part] = {}
+                        stock_stances[stock_part][perspective] = stance
 
-            return local_agreements, local_disagreements
+            round_weight = round_num 
+            for symbol, stances in stock_stances.items():
+                if len(stances) == 3:
+                    f_stance = stances.get("fundamental", "neutral")
+                    t_stance = stances.get("technical", "neutral")
+                    r_stance = stances.get("risk", "neutral")
 
-        a, d = check_pairwise(all_fundamental_text, all_technical_text)
-        agreements += a
-        disagreements += d
+                    if f_stance == t_stance == r_stance and f_stance in ["bullish", "bearish"]:
+                        increments += 0.15 * round_weight
+                    else:
+                        increments -= 0.1 * round_weight
 
-        a, d = check_pairwise(all_fundamental_text, all_risk_text)
-        agreements += a
-        disagreements += d
-
-        a, d = check_pairwise(all_technical_text, all_risk_text)
-        agreements += a
-        disagreements += d
-
-        confidence += (agreements * 0.05)
-        confidence -= (disagreements * 0.05)
-
-        if ("moving average crossing above price" in all_fundamental_text and
-            "moving average crossing above price" in all_technical_text) or \
-           ("moving average crossing above price" in all_fundamental_text and
-            "moving average crossing above price" in all_risk_text) or \
-           ("moving average crossing above price" in all_technical_text and
-            "moving average crossing above price" in all_risk_text):
-            confidence += 0.03
+        confidence += increments / sum_of_weights
 
         confidence = max(0.0, min(1.0, confidence))
         return confidence
