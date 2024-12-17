@@ -282,23 +282,55 @@ class SystemEvaluator:
             }
         }
         
-        # Add performance metrics
-        results['overall_metrics']['performance'] = {
-            'mean_arr': np.mean([m['arr'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_sharpe_ratio': np.mean([m['sharpe_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_volatility': np.mean([m['volatility'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_max_drawdown': np.mean([m['max_drawdown'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_calmar_ratio': np.mean([m['calmar_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_sortino_ratio': np.mean([m['sortino_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'best_arr': max([m['arr'] for m in valid_performance]) if valid_performance else 0.0,
-            'best_sharpe_ratio': max([m['sharpe_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'worst_drawdown': min([m['max_drawdown'] for m in valid_performance]) if valid_performance else 0.0,
-            'best_calmar_ratio': max([m['calmar_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'best_sortino_ratio': max([m['sortino_ratio'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_strategy_return': np.mean([m['strategy_return'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_strategy_sharpe': np.mean([m['strategy_sharpe'] for m in valid_performance]) if valid_performance else 0.0,
-            'mean_strategy_arr': np.mean([m['strategy_arr'] for m in valid_performance]) if valid_performance else 0.0
-        }
+        # Get valid performance metrics
+        valid_performance = [
+            m for m in results['performance_metrics'].values() 
+            if isinstance(m, dict) and all(k in m for k in [
+                'sharpe_ratio', 'max_drawdown', 'annualized_return',
+                'strategy_return', 'strategy_sharpe'
+            ])
+        ]
+        
+        # Calculate performance metrics
+        if valid_performance:
+            results['overall_metrics']['performance'] = {
+                # Asset Performance
+                'mean_return': np.mean([m['total_return'] for m in valid_performance]),
+                'best_return': max([m['total_return'] for m in valid_performance]),
+                
+                # Risk-Adjusted Returns
+                'mean_sharpe_ratio': np.mean([m['sharpe_ratio'] for m in valid_performance]),
+                'best_sharpe_ratio': max([m['sharpe_ratio'] for m in valid_performance]),
+                'mean_sortino_ratio': np.mean([m['sortino_ratio'] for m in valid_performance]),
+                'best_sortino_ratio': max([m['sortino_ratio'] for m in valid_performance]),
+                'mean_calmar_ratio': np.mean([m['calmar_ratio'] for m in valid_performance]),
+                'best_calmar_ratio': max([m['calmar_ratio'] for m in valid_performance]),
+                
+                # Risk Metrics
+                'mean_volatility': np.mean([m['volatility'] for m in valid_performance]),
+                'mean_max_drawdown': np.mean([m['max_drawdown'] for m in valid_performance]),
+                'worst_drawdown': min([m['max_drawdown'] for m in valid_performance]),
+                
+                # Strategy Performance
+                'mean_strategy_return': np.mean([m['strategy_return'] for m in valid_performance]),
+                'mean_strategy_sharpe': np.mean([m['strategy_sharpe'] for m in valid_performance])
+            }
+        else:
+            results['overall_metrics']['performance'] = {
+                'mean_return': 0.0,
+                'best_return': 0.0,
+                'mean_sharpe_ratio': 0.0,
+                'best_sharpe_ratio': 0.0,
+                'mean_sortino_ratio': 0.0,
+                'best_sortino_ratio': 0.0,
+                'mean_calmar_ratio': 0.0,
+                'best_calmar_ratio': 0.0,
+                'mean_volatility': 0.0,
+                'mean_max_drawdown': 0.0,
+                'worst_drawdown': 0.0,
+                'mean_strategy_return': 0.0,
+                'mean_strategy_sharpe': 0.0
+            }
     
     def _save_results(self, results: Dict[str, Any]):
         """Save evaluation results to files with comprehensive metrics and metadata"""
@@ -673,54 +705,75 @@ class SystemEvaluator:
     def _calculate_performance_metrics(self, results: Dict[str, Any], symbol: str, 
                                         hist_data: pd.DataFrame, signal: bool, 
                                         actual_return: float) -> Dict[str, float]:
-        """Calculate advanced performance metrics for a symbol"""
+        """Calculate performance metrics for a symbol"""
         try:
             # Calculate daily returns and get prices
             returns = hist_data['Close'].pct_change().dropna().tolist()
             prices = hist_data['Close'].tolist()
+            returns_array = np.array(returns)
             
-            # Calculate comprehensive metrics
-            metrics = calculate_performance_metrics(prices, returns)
+            # Calculate metrics
+            # Simple return (not annualized)
+            total_return = (prices[-1] - prices[0]) / prices[0]
             
-            # Calculate strategy-specific metrics
+            # Volatility - standard deviation of returns
+            volatility = np.std(returns_array, ddof=1)
+            
+            # Sharpe Ratio - using actual returns without annualizing
+            sharpe_ratio = np.mean(returns_array) / np.std(returns_array, ddof=1) if np.std(returns_array, ddof=1) != 0 else 0
+            
+            # Maximum Drawdown
+            cumulative_returns = np.cumprod(1 + returns_array)
+            rolling_max = np.maximum.accumulate(cumulative_returns)
+            drawdowns = (rolling_max - cumulative_returns) / rolling_max
+            max_drawdown = np.max(drawdowns)
+            
+            # Calmar Ratio - using actual returns
+            calmar_ratio = total_return / max_drawdown if max_drawdown != 0 else 0.0
+            
+            # Sortino Ratio - using actual returns
+            negative_returns = returns_array[returns_array < 0]
+            downside_deviation = np.std(negative_returns, ddof=1) if len(negative_returns) > 1 else 1e-6
+            sortino_ratio = np.mean(returns_array) / downside_deviation if downside_deviation != 0 else 0
+            
+            # Strategy-specific metrics
             strategy_return = actual_return if signal else -actual_return
-            strategy_metrics = calculate_performance_metrics(
-                [1.0, 1.0 + strategy_return],  # Simple 2-point price series for strategy
-                [strategy_return]  # Single return for strategy
-            )
+            strategy_sharpe = strategy_return / volatility if volatility != 0 else 0
             
-            # Combine metrics
-            combined_metrics = {
-                **metrics,  # Base metrics
+            metrics = {
+                'total_return': total_return,
+                'sharpe_ratio': sharpe_ratio,
+                'volatility': volatility,
+                'max_drawdown': max_drawdown,
+                'calmar_ratio': calmar_ratio,
+                'sortino_ratio': sortino_ratio,
                 'strategy_return': strategy_return,
-                'strategy_sharpe': strategy_metrics['sharpe_ratio'],
-                'strategy_arr': strategy_metrics['arr']
+                'strategy_sharpe': strategy_sharpe
             }
             
             logging.info(f"{symbol} Performance Metrics:")
-            logging.info(f"- Annual Rate of Return: {combined_metrics['arr']:.2%}")
-            logging.info(f"- Sharpe Ratio: {combined_metrics['sharpe_ratio']:.2f}")
-            logging.info(f"- Volatility: {combined_metrics['volatility']:.2%}")
-            logging.info(f"- Maximum Drawdown: {combined_metrics['max_drawdown']:.2%}")
-            logging.info(f"- Calmar Ratio: {combined_metrics['calmar_ratio']:.2f}")
-            logging.info(f"- Sortino Ratio: {combined_metrics['sortino_ratio']:.2f}")
-            logging.info(f"- Strategy Return: {combined_metrics['strategy_return']:.2%}")
-            logging.info(f"- Strategy Sharpe: {combined_metrics['strategy_sharpe']:.2f}")
+            logging.info(f"- Total Return: {total_return:.2%}")
+            logging.info(f"- Sharpe Ratio: {sharpe_ratio:.2f}")
+            logging.info(f"- Volatility: {volatility:.2%}")
+            logging.info(f"- Maximum Drawdown: {max_drawdown:.2%}")
+            logging.info(f"- Calmar Ratio: {calmar_ratio:.2f}")
+            logging.info(f"- Sortino Ratio: {sortino_ratio:.2f}")
+            logging.info(f"- Strategy Return: {strategy_return:.2%}")
+            logging.info(f"- Strategy Sharpe: {strategy_sharpe:.2f}")
             
-            return combined_metrics
+            return metrics
             
         except Exception as e:
             logging.error(f"Error calculating performance metrics for {symbol}: {str(e)}")
             return {
-                'arr': 0.0,
+                'total_return': 0.0,
                 'sharpe_ratio': 0.0,
                 'volatility': 0.0,
                 'max_drawdown': 0.0,
                 'calmar_ratio': 0.0,
                 'sortino_ratio': 0.0,
                 'strategy_return': 0.0,
-                'strategy_sharpe': 0.0,
-                'strategy_arr': 0.0
+                'strategy_sharpe': 0.0
             }
 
 def calculate_performance_metrics(prices: List[float], returns: List[float]) -> Dict[str, float]:

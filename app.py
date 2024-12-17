@@ -10,6 +10,7 @@ from agents.coordinator_agent import CoordinatorAgent
 from config import AGENT_SETTINGS, TRADING_SETTINGS, NEWS_SOURCES, AVAILABLE_MODELS, FREE_TIER_SETTINGS
 import os
 import json
+from typing import Dict, Any
 
 # Page config
 st.set_page_config(
@@ -184,8 +185,6 @@ def update_config():
 def show_agent_output(agent_type: str, output: dict):
     """Display the output of an individual agent"""
     with st.expander(f"{agent_type.replace('_', ' ').title()} Output", expanded=False):
-        # st.markdown(f"<div class='analysis-box'>", unsafe_allow_html=True)
-        
         # Display timestamp
         st.write(f"Analysis Time: {output.get('timestamp', 'N/A')}")
         
@@ -196,12 +195,56 @@ def show_agent_output(agent_type: str, output: dict):
             st.write("Analyzed Symbols:", ", ".join(output.get('analyzed_symbols', [])))
             
         elif agent_type == "reflection_agent":
-            st.write("Reflection Analysis:")
-            st.markdown(output.get('reflection_analysis', 'No analysis available'))
-            if 'patterns_identified' in output:
-                st.write("Patterns Identified:")
-                st.json(output['patterns_identified'])
+            # Display Action and Confidence
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Action", output.get('reflection_analysis', {}).get('action', 'UNKNOWN'))
+            with col2:
+                confidence = output.get('reflection_analysis', {}).get('confidence_score', 0) * 100
+                st.metric("Confidence", f"{confidence:.1f}%")
+            
+            # Market Intelligence Section
+            if 'market_intelligence' in output:
+                st.markdown("### 📊 Market Intelligence")
+                mi = output['market_intelligence']
+                st.markdown(mi.get('latest_summary', ''))
+                st.markdown(f"**Overall Sentiment:** {mi.get('sentiment', 'N/A')}")
+            
+            # Low Level Reflection Section
+            if 'low_level_reflection' in output:
+                st.markdown("### 🔍 Detailed Analysis")
+                llr = output['low_level_reflection']
                 
+                # Price Analysis
+                if 'price_analysis' in llr:
+                    st.markdown("#### Technical Analysis")
+                    for symbol, analysis in llr['price_analysis'].items():
+                        st.markdown(f"**{symbol}**")
+                        st.markdown(analysis)
+                
+                # Reasonings
+                if 'reasonings' in llr:
+                    st.markdown("#### Market Reasoning")
+                    for timeframe, reasoning in llr['reasonings'].items():
+                        if reasoning != "Medium Term analysis pending.":
+                            st.markdown(reasoning)
+            
+            # High Level Reflection Section
+            if 'high_level_reflection' in output:
+                st.markdown("### 📈 Strategic Overview")
+                hlr = output['high_level_reflection']
+                st.markdown(hlr.get('summary', ''))
+                st.markdown(hlr.get('improvements', ''))
+            
+            # Reflection Analysis Section
+            if 'reflection_analysis' in output:
+                st.markdown("### 🎯 Final Analysis")
+                analysis = output['reflection_analysis']
+                st.markdown(analysis.get('action', ''))
+                st.markdown(analysis.get('reasoning', ''))
+                st.markdown(analysis.get('analysis', ''))
+                st.write(f"Confidence Score: {analysis.get('confidence_score', 0):.2%}")
+            
         elif agent_type == "debate_agent":
             st.write("Debate Analysis:")
             st.markdown(output.get('debate_analysis', 'No analysis available'))
@@ -210,8 +253,6 @@ def show_agent_output(agent_type: str, output: dict):
                     st.write(f"\nRound {round_data['round']} ({round_data['perspective'].upper()}):")
                     st.markdown(round_data['arguments'])
             st.write(f"Confidence Score: {output.get('confidence_score', 0):.2%}")
-        
-        st.markdown("</div>", unsafe_allow_html=True)
 
 def config_sidebar():
     """Create the configuration sidebar"""
@@ -523,7 +564,9 @@ def main():
                         debate_analysis = coordinator.debate_agent.analyze({
                             "market_data": market_data,
                             "proposed_action": analysis_context["proposed_action"],
-                            "timestamp": datetime.now().isoformat()
+                            "timestamp": datetime.now().isoformat(),
+                            "news_analysis": news_analysis,
+                            "reflection_analysis": reflection_analysis
                         })
                         show_agent_output("debate_agent", debate_analysis)
                     
