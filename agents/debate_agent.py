@@ -88,9 +88,9 @@ class DebateAgent(BaseAgent):
 
                 Instructions:
                 - For each stock listed above, choose either Bullish or Bearish stance.
-                - Then provide a short viewpoint (1-2 sentences max) for that stock.
+                - Then provide a short but specific viewpoint (4-5 sentences max) for that stock.
                 - Format the output so that for each stock you produce exactly one line:
-                "Stock: SYMBOL - Bullish(or Bearish) Your short viewpoint"
+                    "Stock: SYMBOL - Bullish(or Bearish) Your short viewpoint"
                 - Do this in the same order as the stocks are listed.
                 - Keep it concise and debate-like.
                 """
