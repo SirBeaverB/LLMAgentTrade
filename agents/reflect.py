@@ -143,31 +143,31 @@ class ReflectionAgent(BaseAgent):
             self.last_transfer_time = now
 
     def transfer_to_long_term_memory(self):
-    if self.short_term_memory:
-        role = "You are a highly experienced memory aggregation agent specializing in financial and strategic data integration."
-        prompt = f"""
-        You are given a series of short-term memory entries reflecting recent observations, actions, and insights. Your task is to review these entries and produce a concise yet comprehensive summary that captures the most significant trends, patterns, and insights. This summary will serve as a long-term reference, informing future analysis and decision-making.
-
-        Context:
-        Short-Term Memory Entries:
-        {self.short_term_memory}
-
-        Instructions:
-        1. Carefully examine the provided short-term memory data for recurring themes, notable shifts, performance indicators, and any emergent patterns.
-        2. Synthesize these observations into a cohesive long-term memory summary, focusing on the most critical and enduring insights rather than transient details.
-        3. Keep the summary professional, clear, and actionable, limited to a short paragraph (2-4 sentences). The summary should be easily understandable for future reference.
-
-        Please provide the aggregated long-term memory summary now:
-        """
-        aggregation = self._call_llm(role, prompt).strip()
-
-        aggregated_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "aggregated_results": self.short_term_memory,
-            "aggregated_summary": aggregation
-        }
-        self.long_term_memory.append(aggregated_entry)
-        self.short_term_memory = []
+        if self.short_term_memory:
+            role = "You are a highly experienced memory aggregation agent specializing in financial and strategic data integration."
+            prompt = f"""
+            You are given a series of short-term memory entries reflecting recent observations, actions, and insights. Your task is to review these entries and produce a concise yet comprehensive summary that captures the most significant trends, patterns, and insights. This summary will serve as a long-term reference, informing future analysis and decision-making.
+    
+            Context:
+            Short-Term Memory Entries:
+            {self.short_term_memory}
+    
+            Instructions:
+            1. Carefully examine the provided short-term memory data for recurring themes, notable shifts, performance indicators, and any emergent patterns.
+            2. Synthesize these observations into a cohesive long-term memory summary, focusing on the most critical and enduring insights rather than transient details.
+            3. Keep the summary professional, clear, and actionable, limited to a short paragraph (2-4 sentences). The summary should be easily understandable for future reference.
+    
+            Please provide the aggregated long-term memory summary now:
+            """
+            aggregation = self._call_llm(role, prompt).strip()
+    
+            aggregated_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "aggregated_results": self.short_term_memory,
+                "aggregated_summary": aggregation
+            }
+            self.long_term_memory.append(aggregated_entry)
+            self.short_term_memory = []
 
     def _summarize_long_term_memory(self) -> str:
         if not self.long_term_memory:
