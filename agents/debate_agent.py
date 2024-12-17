@@ -46,8 +46,30 @@ class DebateAgent(BaseAgent):
     def analyze(self, data: Dict[str, Any]) -> Dict[str, Any]:
         market_data = data.get("market_data", {})
         proposed_action = data.get("proposed_action", {})
+        news_analysis = data.get("news_analysis", {})
+        reflection_analysis = data.get("reflection_analysis", {})
+
+        # Add context to roles based on other agents' analyses
+        enhanced_roles = []
+        for role in self.roles:
+            role_info = role.copy()
+            
+            # Add context to role description
+            context_additions = f"""
+            Consider the following additional context in your analysis:
+            
+            News Analysis:
+            {news_analysis}
+            
+            Reflection Analysis:
+            {reflection_analysis}
+            """
+            
+            role_info["description"] = role_info["description"] + context_additions
+            enhanced_roles.append(role_info)
         
-        debate_results = self._conduct_debate(market_data, proposed_action)
+        # Use enhanced roles for debate
+        debate_results = self._conduct_debate(market_data, proposed_action, enhanced_roles)
         
         final_analysis = self._synthesize_debate(debate_results)
         
@@ -61,13 +83,14 @@ class DebateAgent(BaseAgent):
         self.save_to_memory(analysis_result)
         return analysis_result
     
-    def _conduct_debate(self, market_data: Dict[str, Any], proposed_action: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _conduct_debate(self, market_data: Dict[str, Any], proposed_action: Dict[str, Any], 
+                       enhanced_roles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         debate_rounds = []
         stocks = sorted(market_data.keys())
 
         for round_num in range(self.debate_rounds):
             round_results = []
-            for role_info in self.roles:
+            for role_info in enhanced_roles:
                 if round_num == 0:
                     role = role_info["description"]
                 else:

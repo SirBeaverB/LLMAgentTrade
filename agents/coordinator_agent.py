@@ -30,7 +30,7 @@ class CoordinatorAgent(BaseAgent):
         
         analyses = {}
         
-        # Collect insights from enabled agents
+        # 1. First get news analysis
         if enabled_agents.get("news_agent", True):
             news_analysis = self.news_agent.analyze({
                 "symbols": data.get("symbols", []),
@@ -46,6 +46,7 @@ class CoordinatorAgent(BaseAgent):
                 "timestamp": data.get("timestamp")
             }
         
+        # 2. Then get reflection analysis
         if enabled_agents.get("reflection_agent", True):
             reflection_analysis = self.reflection_agent.analyze({
                 "symbols": data.get("symbols", []),
@@ -64,11 +65,15 @@ class CoordinatorAgent(BaseAgent):
                 "patterns_identified": [{"pattern_type": "disabled", "success_rate": 0.5}]
             }
         
+        # 3. Finally get debate analysis with inputs from other agents
         if enabled_agents.get("debate_agent", True):
             debate_analysis = self.debate_agent.analyze({
                 "market_data": data.get("market_data", {}),
                 "proposed_action": data.get("proposed_action", {}),
-                "timestamp": data.get("timestamp")
+                "timestamp": data.get("timestamp"),
+                # Add other agents' analyses
+                "news_analysis": analyses["news"],
+                "reflection_analysis": analyses["reflection"],
             })
             analyses["debate"] = debate_analysis
             print(f"Debate Analysis: {debate_analysis}")
