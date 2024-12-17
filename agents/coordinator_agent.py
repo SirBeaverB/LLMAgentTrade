@@ -47,8 +47,11 @@ class CoordinatorAgent(BaseAgent):
         
         if enabled_agents.get("reflection_agent", True):
             reflection_analysis = self.reflection_agent.analyze({
+                "symbols": data.get("symbols", []),
+                "news_analysis": analyses["news"],
+                "risk_tolerance": data.get("risk_tolerance", 0.5),
                 "historical_decisions": data.get("historical_decisions", []),
-                "current_market": data.get("market_data", {}),
+                "market_data": data.get("market_data", {}),
                 "timestamp": data.get("timestamp")
             })
             analyses["reflection"] = reflection_analysis
@@ -269,18 +272,18 @@ class CoordinatorAgent(BaseAgent):
         # Add debate confidence if enabled
         if enabled_agents.get("debate_agent", True):
             confidence_scores.append(debate_analysis.get("confidence_score", 0) * 0.4)
-            total_weight += 0.4
+            total_weight += 0.5
         
         # Add reflection confidence if enabled
         if enabled_agents.get("reflection_agent", True):
-            reflection_score = reflection_analysis.get("patterns_identified", [{}])[0].get("success_rate", 0) * 0.35
+            reflection_score = reflection_analysis.get("reflection_analysis", {}).get("confidence_score", 0) * 0.35
             confidence_scores.append(reflection_score)
-            total_weight += 0.35
+            total_weight += 0.3
         
         # Add news confidence if enabled
         if enabled_agents.get("news_agent", True):
             confidence_scores.append(0.25)  # Base confidence from news analysis
-            total_weight += 0.25
+            total_weight += 0.2
         
         # Calculate weighted average, ensuring we don't divide by zero
         if total_weight > 0:

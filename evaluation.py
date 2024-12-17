@@ -10,6 +10,9 @@ import yfinance as yf
 import random
 import logging
 import argparse
+import json
+import platform
+import psutil
 
 # Set up logging
 def setup_logging(log_dir: str = "logs") -> str:
@@ -93,12 +96,15 @@ class SystemEvaluator:
                 }
                 
                 # Generate analysis using historical data
+                historical_decisions = load_historical_decisions()
                 start_time = datetime.now()
                 analysis = self.coordinator.analyze({
                     "symbols": [symbol],
                     "market_data": market_data,
                     "timestamp": training_data.index[-1].isoformat(),
-                    "proposed_action": {"type": "ANALYSIS", "symbols": [symbol]}
+                    "proposed_action": {"type": "ANALYSIS", "symbols": [symbol]},
+                    "risk_tolerance": TRADING_SETTINGS["risk_tolerance"],
+                    "historical_decisions": historical_decisions,
                 })
                 end_time = datetime.now()
                 
@@ -264,33 +270,149 @@ class SystemEvaluator:
         }
     
     def _save_results(self, results: Dict[str, Any]):
-        """Save evaluation results to files"""
+        """Save evaluation results to files with comprehensive metrics and metadata"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
-        # Save detailed results as CSV
-        results_df = pd.DataFrame({
-            'Symbol': list(results['signal_accuracy'].keys()),
-            'Signal_Accuracy': list(results['signal_accuracy'].values()),
-            'Consensus_Score': [m['consensus_score'] for m in results['debate_quality'].values()],
-            'Argument_Quality': [m['argument_quality'] for m in results['debate_quality'].values()],
-            'Perspective_Diversity': [m['perspective_diversity'] for m in results['debate_quality'].values()],
-            'Response_Time': [m['response_time'] for m in results['system_performance'].values()],
-            'Success_Rate': [m['success_rate'] for m in results['technical_reliability'].values()]
-        })
+        # Create a comprehensive DataFrame with all metrics
+        results_data = []
+        for symbol in results['signal_accuracy'].keys():
+            # Get all metrics for the symbol
+            signal_metrics = results['signal_accuracy'].get(symbol, {})
+            debate_metrics = results['debate_quality'].get(symbol, {})
+            performance_metrics = results['system_performance'].get(symbol, {})
+            reliability_metrics = results['technical_reliability'].get(symbol, {})
+            
+            symbol_data = {
+                'Symbol': symbol,
+                'Timestamp': datetime.now().isoformat(),
+                
+                # Signal Accuracy Metrics
+                'Binary_Accuracy': signal_metrics.get('binary', 0.0),
+                'Weighted_Accuracy': signal_metrics.get('weighted', 0.0),
+                'Confidence': signal_metrics.get('confidence', 0.0),
+                'Confidence_Weighted_Accuracy': signal_metrics.get('confidence_weighted', 0.0),
+                'Combined_Weighted_Accuracy': signal_metrics.get('combined_weighted', 0.0),
+                'Actual_Return': signal_metrics.get('actual_return', 0.0),
+                'Predicted_Signal': signal_metrics.get('predicted_signal', False),
+                
+                # Debate Quality Metrics
+                'Consensus_Score': debate_metrics.get('consensus_score', 0.0),
+                'Argument_Quality': debate_metrics.get('argument_quality', 0.0),
+                'Perspective_Diversity': debate_metrics.get('perspective_diversity', 0.0),
+                
+                # System Performance Metrics
+                'Response_Time_Seconds': performance_metrics.get('response_time', 0.0),
+                'Memory_Usage_MB': performance_metrics.get('memory_usage', 0.0),
+                'API_Calls': performance_metrics.get('api_calls', 0),
+                'Confidence_Score': performance_metrics.get('confidence_score', 0.0),
+                
+                # Technical Reliability Metrics
+                'Success_Rate': reliability_metrics.get('success_rate', 0.0),
+                'Stability_Score': reliability_metrics.get('stability_score', 0.0),
+                'Error_Types': ','.join(reliability_metrics.get('error_types', [])),
+                
+                # Additional Signal Analysis
+                'High_Confidence_Signal': signal_metrics.get('confidence', 0.0) > 0.7,
+                'Signal_Strength': abs(signal_metrics.get('weighted', 0.0)),
+                'Return_Direction': 'Positive' if signal_metrics.get('actual_return', 0.0) > 0 else 'Negative',
+                'Return_Magnitude': abs(signal_metrics.get('actual_return', 0.0)),
+                
+                # Additional Debate Analysis
+                'Debate_Rounds': len(debate_metrics.get('debate_rounds', [])) if isinstance(debate_metrics.get('debate_rounds'), list) else 0,
+                'Unique_Perspectives': debate_metrics.get('unique_perspectives', 0),
+                'Average_Argument_Length': debate_metrics.get('avg_argument_length', 0),
+                
+                # Additional Performance Metrics
+                'Peak_Memory_Usage_MB': performance_metrics.get('peak_memory_usage', 0.0),
+                'Total_Processing_Time': performance_metrics.get('total_processing_time', 0.0),
+                'API_Response_Times': str(performance_metrics.get('api_response_times', [])),
+                
+                # Additional Reliability Metrics
+                'Error_Count': len(reliability_metrics.get('error_types', [])),
+                'Average_Response_Time': reliability_metrics.get('avg_response_time', 0.0),
+                'Response_Time_Stability': reliability_metrics.get('response_time_stability', 0.0)
+            }
+            results_data.append(symbol_data)
+        
+        results_df = pd.DataFrame(results_data)
         
         # Create results directory if it doesn't exist
         results_dir = "evaluation_results"
         if not os.path.exists(results_dir):
             os.makedirs(results_dir)
         
-        # Save CSV and full results
+        # Save detailed per-symbol results as CSV
         csv_path = os.path.join(results_dir, f'evaluation_results_{timestamp}.csv')
-        json_path = os.path.join(results_dir, f'evaluation_results_{timestamp}.json')
-        
         results_df.to_csv(csv_path, index=False)
-        pd.DataFrame([results]).to_json(json_path, orient='records')
         
-        logging.info(f"Results saved to:\n- {csv_path}\n- {json_path}")
+        # Create a complete results dictionary with metadata
+        complete_results = {
+            'metadata': {
+                'timestamp': timestamp,
+                'evaluation_params': results['evaluation_params'],
+                'num_symbols_evaluated': len(results_data),
+                'evaluation_duration': (datetime.now() - datetime.fromisoformat(results['evaluation_params']['timestamp'])).total_seconds(),
+                'system_info': {
+                    'python_version': platform.python_version(),
+                    'os_platform': platform.platform(),
+                    'memory_available': psutil.virtual_memory().total / (1024 * 1024 * 1024),  # GB
+                    'cpu_count': psutil.cpu_count(),
+                    'evaluation_process_id': os.getpid()
+                },
+                'configuration': {
+                    'agent_settings': AGENT_SETTINGS,
+                    'trading_settings': TRADING_SETTINGS
+                }
+            },
+            'evaluation_summary': {
+                'coverage': {
+                    'total_symbols': results['evaluation_params']['num_symbols'],
+                    'valid_evaluations': results['overall_metrics']['signal_accuracy']['num_valid'],
+                    'failed_evaluations': results['evaluation_params']['num_symbols'] - results['overall_metrics']['signal_accuracy']['num_valid'],
+                    'coverage_rate': results['overall_metrics']['signal_accuracy']['num_valid'] / results['evaluation_params']['num_symbols']
+                },
+                'performance_overview': {
+                    'total_processing_time': sum(symbol['Response_Time_Seconds'] for symbol in results_data),
+                    'average_memory_usage': np.mean([symbol['Memory_Usage_MB'] for symbol in results_data]),
+                    'total_api_calls': sum(symbol['API_Calls'] for symbol in results_data),
+                    'error_rate': len([symbol for symbol in results_data if symbol['Error_Count'] > 0]) / len(results_data)
+                }
+            },
+            'per_symbol_results': results_df.to_dict(orient='records'),
+            'overall_metrics': results['overall_metrics'],
+            'summary': results['summary'],
+            'raw_data': {
+                'signal_accuracy': results['signal_accuracy'],
+                'debate_quality': results['debate_quality'],
+                'system_performance': results['system_performance'],
+                'technical_reliability': results['technical_reliability']
+            }
+        }
+        
+        # Save complete results as JSON
+        json_path = os.path.join(results_dir, f'evaluation_results_{timestamp}.json')
+        with open(json_path, 'w') as f:
+            json.dump(complete_results, f, indent=2, default=str)
+        
+        # Save summary separately for quick access
+        summary_path = os.path.join(results_dir, f'evaluation_summary_{timestamp}.json')
+        with open(summary_path, 'w') as f:
+            json.dump({
+                'metadata': complete_results['metadata'],
+                'evaluation_summary': complete_results['evaluation_summary'],
+                'summary': results['summary'],
+                'overall_metrics': results['overall_metrics']
+            }, f, indent=2, default=str)
+        
+        logging.info(f"Results saved to:\n- CSV (per-symbol details): {csv_path}\n- JSON (complete results): {json_path}\n- JSON (summary): {summary_path}")
+        
+        # Generate quick stats for immediate review
+        logging.info("\nQuick Statistics:")
+        logging.info(f"Total Symbols Evaluated: {len(results_data)}")
+        logging.info(f"Success Rate: {complete_results['evaluation_summary']['coverage']['coverage_rate']:.2%}")
+        logging.info(f"Average Processing Time: {complete_results['evaluation_summary']['performance_overview']['total_processing_time']/len(results_data):.2f}s per symbol")
+        logging.info(f"Total API Calls: {complete_results['evaluation_summary']['performance_overview']['total_api_calls']}")
+        logging.info(f"Error Rate: {complete_results['evaluation_summary']['performance_overview']['error_rate']:.2%}")
     
     def evaluate_signal_accuracy(self, symbols: List[str], lookback_days: int = 30) -> Dict[str, float]:
         """
