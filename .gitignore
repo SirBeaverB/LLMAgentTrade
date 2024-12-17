@@ -30,3 +30,9 @@ build/
 # Local development settings
 *.log
 .DS_Store
+
+# Evaluation results
+evaluation_results/
+
+# Logs
+logs/

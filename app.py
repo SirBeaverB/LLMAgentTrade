@@ -470,8 +470,11 @@ def main():
                     
                     if st.session_state.enabled_agents["reflection_agent"]:
                         reflection_analysis = coordinator.reflection_agent.analyze({
+                            "symbols": selected_symbols,
+                            "news_analysis": news_analysis,
+                            "risk_tolerance": TRADING_SETTINGS["risk_tolerance"],
                             "historical_decisions": historical_decisions,
-                            "current_market": market_data,
+                            "market_data": market_data,
                             "timestamp": datetime.now().isoformat()
                         })
                         show_agent_output("reflection_agent", reflection_analysis)
