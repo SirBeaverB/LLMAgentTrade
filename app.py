@@ -268,6 +268,20 @@ def config_sidebar():
                         key=f"{agent}_tokens"
                     )
     else:
+        # Display prominent warning for free tier
+        st.sidebar.warning("""
+        ⚠️ **WARNING: Free Tier Limitations** ⚠️
+        
+        The free tier uses basic HuggingFace models with significant limitations:
+        - Severely reduced performance
+        - Limited context understanding
+        - Basic response quality
+        - Truncated inputs due to token limits
+        
+        This tier is intended for testing and development only.
+        For actual trading analysis, please use the Premium tier with OpenAI models.
+        """, icon="⚠️")
+        
         # Free tier configuration
         st.sidebar.subheader("HuggingFace API Key")
         hf_api_key = st.sidebar.text_input(
@@ -277,19 +291,23 @@ def config_sidebar():
             key="huggingface_api_key"
         )
         
-        # Free tier model selection
+        # Free tier model selection with warning
         st.sidebar.subheader("Model Selection")
         selected_model = st.sidebar.selectbox(
             "Select Free Model",
             options=AVAILABLE_MODELS["free"],
             index=0,
-            help="Select a HuggingFace model to use"
+            help="⚠️ These models have limited capabilities and are for testing only"
         )
         FREE_TIER_SETTINGS["model"] = selected_model
         
         # Update all agents to use the selected free model
         for agent in AGENT_SETTINGS:
             AGENT_SETTINGS[agent].update(FREE_TIER_SETTINGS)
+        
+        # Pass the API key to the agent config
+        for agent in AGENT_SETTINGS:
+            AGENT_SETTINGS[agent]["huggingface_api_key"] = hf_api_key
     
     # Agent Enable/Disable Section
     st.sidebar.subheader("Enable/Disable Agents")
