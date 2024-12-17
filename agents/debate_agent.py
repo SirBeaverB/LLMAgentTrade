@@ -71,7 +71,6 @@ class DebateAgent(BaseAgent):
                 if round_num == 0:
                     role = role_info["description"]
                 else:
-                    # 修改后的描述，每一轮都允许改变观点，并要求对上轮论点进行回应
                     role = f"""You are the {role_info['name']} analyst. Continue focusing on your domain.
                                You may change Bullish/Bearish stance freely this round.
                                You must explicitly refute or support previous round's differing opinions from the short-term memory.
@@ -85,7 +84,6 @@ class DebateAgent(BaseAgent):
                     [f"{i+1}. {symbol}: {market_data[symbol]}" for i, symbol in enumerate(stocks)]
                 )
 
-                # 修改的Prompt：在Instructions中明确要求参考short-term memory，并对上轮中与自己观点不符的观点进行反驳或解释。
                 content = f"""
                 Round {round_num + 1} of debate ({perspective_name.upper()}):
 
@@ -123,11 +121,7 @@ class DebateAgent(BaseAgent):
 
             debate_rounds.extend(round_results)
 
-            # 从本轮的论点提取立场
             stock_stances = self._extract_stock_stances(round_results, stocks)
-
-            # 移除原有的提前终止逻辑，不再检查是否所有观点一致
-            # 原逻辑删除（下方是原位置的逻辑，现在已删除）
 
             last_round_num = round_results[-1]['round']
             this_round_data = [r['arguments'] for r in round_results if r['round'] == last_round_num]
