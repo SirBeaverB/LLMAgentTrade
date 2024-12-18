@@ -1,4 +1,5 @@
 # Multi-Agent Quants 🤖📈
+![Multi-Agent Quants Interface](utils/icon.ico)
 
 A sophisticated multi-agent trading system that enhances financial market predictions using specialized AI agents powered by Large Language Models (LLMs).
 
