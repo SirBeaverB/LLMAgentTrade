@@ -5,7 +5,7 @@ from agents.reflection_agent import ReflectionAgent
 from agents.debate_agent import DebateAgent
 from config import AGENT_SETTINGS
 import re
-
+import time
 class CoordinatorAgent(BaseAgent):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -93,8 +93,10 @@ class CoordinatorAgent(BaseAgent):
             confidence_scores["reflection"] = analyses["reflection"].get("reflection_analysis", {}).get("confidence_score", 0)
         if enabled_agents.get("debate_agent", True):
             confidence_scores["debate"] = analyses["debate"].get("confidence_score", 0)
+        print(f"Confidence scores: {confidence_scores}")
         
         weights = self._get_agent_weights(confidence_scores, data.get("historical_decisions", []))
+        print(f"Weights: {weights}")
 
         # Synthesize all analyses
         final_decision = self._synthesize_analyses(
@@ -358,7 +360,10 @@ class CoordinatorAgent(BaseAgent):
         """
 
         try:
+            start_time = time.time()
             response = self._create_prompt(role, content)
+            end_time = time.time()
+            print(f"Time taken to get response: {end_time - start_time} seconds")
             
             # Parse weights from response
             weights = {}
@@ -378,6 +383,8 @@ class CoordinatorAgent(BaseAgent):
             if abs(total_weight - 1.0) > 0.01 or any(w < 0 for w in weights.values()):
                 print(f"Warning: Invalid weights received: {weights}. Using default weights.")
                 return default_weights
+            end_time = time.time()
+            print(f"Time taken to validate weights: {end_time - start_time} seconds")
                 
             return weights
             
