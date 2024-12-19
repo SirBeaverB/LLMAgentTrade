@@ -97,7 +97,8 @@ class SystemEvaluator:
                 }
                 
                 # Generate analysis using historical data
-                historical_decisions = load_historical_decisions()
+                # historical_decisions = load_historical_decisions()
+                historical_decisions = []
                 start_time = datetime.now()
                 analysis = self.coordinator.analyze({
                     "symbols": [symbol],

@@ -26,22 +26,22 @@ FREE_TIER_SETTINGS = {
 # Agent Configuration
 AGENT_SETTINGS = {
     "news_agent": {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "temperature": 0.7,
         "max_tokens": 1500
     },
     "reflection_agent": {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "temperature": 0.7,
         "max_tokens": 1500
     },
     "debate_agent": {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "temperature": 0.7,
         "max_tokens": 2000
     },
     "coordinator_agent": {
-        "model": "gpt-4o",
+        "model": "gpt-4o-mini",
         "temperature": 0.5,
         "max_tokens": 1000
     }
@@ -54,13 +54,6 @@ AVAILABLE_MODELS = {
         # WARNING: Free tier models have significantly reduced performance
         # and are mainly suitable for testing purposes. For production use,
         # please use the premium tier with OpenAI models.
-        
-        # Note: Mistral-7B-Instruct requires:
-        # 1. A Pro subscription on HuggingFace
-        # 2. Explicit model access approval
-        # 3. Special API endpoints
-        # "mistralai/Mistral-7B-Instruct-v0.1",  # Requires Pro subscription
-        
         "gpt2",                                # Most reliable but basic
         "distilgpt2",                         # Faster but less capable
         "bigscience/bloom-560m",              # Medium model, mixed results

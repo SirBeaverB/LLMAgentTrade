@@ -21,7 +21,7 @@ Access the deployed version at: [Multi-Agent Quants Web App](https://multi-agent
 Our system comprises four specialized agents, each with distinct responsibilities:
 
 ### 1. News-Driven Agent
-- Retrieves and processes data from diverse sourcess
+- Retrieves and processes data from diverse sources
 - Employs concurrent processing for efficient data retrieval
 
 ### 2. Reflection-Driven Agent
@@ -158,7 +158,3 @@ All settings can be adjusted through the web interface:
 ## Contributing
 
 Feel free to submit issues, fork the repository, and create pull requests for any improvements.
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
